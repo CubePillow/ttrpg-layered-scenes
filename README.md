@@ -6,6 +6,12 @@ and players can move, re-prompt or regenerate single layers as the story moves o
 
 Research focus: **controllability** and layer-by-layer editing.
 
+## Important links
+
+- [Project proposal](https://docs.google.com/document/d/1Lz25EpAJJpKTYKxB1rv7MB7iUOGeFCib-3zZxW-ZP-4/edit): research questions and interaction flow
+- [FastSD CPU: Install and Offline Setup](https://docs.google.com/document/d/1yIu7I4X1hpMfRusVPDoD5JyGqKqsgRSXyvXDhRV0Pdw/edit): local CPU image generation with SD-Turbo / SDXL-Turbo, no GPU or internet needed after setup
+- [FastSD CPU: Prompts and Settings](https://docs.google.com/document/d/1OmJISs_dD3YFeTmEjd9xWLOZPMlfccUEBaCypkj984A/edit): how to write prompts and which settings to use for Text to Image and Image to Image
+
 ## Requirements
 
 - [Node.js](https://nodejs.org) 20 or newer
