@@ -16,7 +16,6 @@ Research focus: **controllability** and layer-by-layer editing.
 
 - [Node.js](https://nodejs.org) 20 or newer
 - [Python](https://python.org) 3.11 or newer
-- [Git](https://git-scm.com)
 
 ## Setup
 
@@ -52,9 +51,6 @@ uvicorn main:app --reload
 The API runs at http://localhost:8000. Check http://localhost:8000/health
 and the interactive API docs at http://localhost:8000/docs.
 
-> **Windows: "running scripts is disabled on this system"?**
-> Run this once in PowerShell, then activate again:
-> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
 
 ## Project structure
 
@@ -70,14 +66,3 @@ ttrpg-layered-scenes/
 └── README.md
 ```
 
-## Adding dependencies
-
-- **Frontend:** `npm install <package>` inside `frontend/`. This updates `package.json`
-  automatically; commit `package.json` and `package-lock.json`.
-- **Backend:** with the virtual environment active, `pip install <package>`, then
-  `pip freeze > requirements.txt` and commit `requirements.txt`.
-
-## Do not commit
-
-`node_modules/`, `.venv/`, `__pycache__/` and `.env` (real API keys) are ignored by `.gitignore`.
-Everyone recreates them locally with `npm install` and `pip install -r requirements.txt`.
