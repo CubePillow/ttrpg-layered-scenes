@@ -22,7 +22,7 @@ Research focus: **controllability** and layer-by-layer editing.
 ### 1. Clone
 
 ```bash
-git clone https://github.com/<your-username>/ttrpg-layered-scenes.git
+git clone https://github.com/CubePillow/ttrpg-layered-scenes.git
 cd ttrpg-layered-scenes
 ```
 
