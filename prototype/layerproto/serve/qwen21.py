@@ -108,7 +108,13 @@ def make(log=print, te_gpu0: str = "5GiB"):
     router = MethodRouter({"qwen21-extract": Qwen21Decomposer(pipe)})
 
     def editor(layer, prompt, seed):
-        from ..layer_edit import edit_layer_keep_alpha
+        from ..layer_edit import edit_layer_keep_alpha, transparent_share
+        if transparent_share(layer) < 0.02:               # an opaque layer (the background): a plain edit; the RGBA prompt would make it transparent
+            import torch
+            with torch.inference_mode():
+                out = pipe(prompt=prompt, image=[layer.convert("RGB")], width=512, height=512, output_resolution=512, use_kv_cache=True,
+                           generator=torch.Generator(pipe._execution_device).manual_seed(seed)).images[0]
+            return out.convert("RGBA"), {"accepted": True, "opaque": True}
         seeds = (seed,) + tuple(x for x in (42, 7, 123, 2024) if x != seed)
         return edit_layer_keep_alpha(lambda im, sd: edit_layer(pipe, im, prompt, sd), layer, seeds=seeds)
 

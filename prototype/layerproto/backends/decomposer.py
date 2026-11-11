@@ -29,6 +29,7 @@ class DecomposeParams:
     cfg: float = 1.0                            # true CFG scale (Qwen-Image-Layered family; 1.0 = no negative pass)
     sampler: str = "euler"                    # Qwen-Image-Layered family: euler or heun
     amodal: bool = False                        # SAM2: fill the parts of each object hidden by objects in front (SDXL-inpaint)
+    only: int = -1                              # qwen21-extract: -1 = every layer; 0 = the background only; k = object k only (one layer per call, so the app can show layers as they arrive)
 
 
 class Decomposer(ABC):

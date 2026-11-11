@@ -45,9 +45,13 @@ class Qwen21Decomposer:
         seeds = tuple(sd + int(p.seed) for sd in self.seeds)             # p.seed 0 = the measured defaults; other values give other versions
         if not names:
             raise ValueError("qwen21-extract needs names (one per object)")
-        bg = self._run(small, background_prompt(names), seeds[0]).convert("RGB")
-        layers = [bg.resize(im.size, Image.LANCZOS).convert("RGBA")]
+        layers = []
+        if p.only in (-1, 0):
+            bg = self._run(small, background_prompt(names), seeds[0]).convert("RGB")
+            layers.append(bg.resize(im.size, Image.LANCZOS).convert("RGBA"))
         for i, n in enumerate(names):
+            if p.only >= 0 and i != p.only - 1:
+                continue
             others = [m for j, m in enumerate(names) if j > i]           # objects drawn in front of this one
             ref = None
             if p.boxes and i < len(p.boxes):                             # a box tells which share of the canvas the object should keep
