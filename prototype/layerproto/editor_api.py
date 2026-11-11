@@ -21,6 +21,7 @@ from .scene import Scene
 
 UI_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ui")
 _SELECTED: dict[str, str] = {}
+_GENERATING: dict[str, str] = {}      # scene id -> what the split is doing now (the editor polls and adds layers as they arrive)
 
 
 def selected(scene_id: str | None) -> str | None:
@@ -30,6 +31,13 @@ def selected(scene_id: str | None) -> str | None:
 def set_selected(scene_id: str, layer_id: str | None) -> None:
     if layer_id:
         _SELECTED[scene_id] = layer_id
+
+
+def set_generating(scene_id: str, text: str | None) -> None:
+    if text:
+        _GENERATING[scene_id] = text
+    else:
+        _GENERATING.pop(scene_id, None)
 
 
 def make_router(engine) -> APIRouter:
@@ -47,7 +55,7 @@ def make_router(engine) -> APIRouter:
             url = f"/scenes/{sc.id}/{v.file}?v={int(os.path.getmtime(os.path.join(engine.s.scenes_dir, sc.id, v.file)))}" if v else ""
             out.append(dict(id=l.id, name=l.name, role=l.role, visible=l.enabled, dx=l.dx, dy=l.dy, scale=l.scale,
                             rot=getattr(l, "rot", 0.0), url=url, variants=len(l.variants)))
-        return dict(id=sc.id, W=engine.s.width, H=engine.s.height, layers=[o for o in out if o["url"]], selected=_SELECTED.get(sc.id))
+        return dict(id=sc.id, W=engine.s.width, H=engine.s.height, layers=[o for o in out if o["url"]], selected=_SELECTED.get(sc.id), generating=_GENERATING.get(sc.id))
 
     @r.get("/editor", response_class=HTMLResponse)
     def editor():
@@ -75,7 +83,8 @@ def make_router(engine) -> APIRouter:
         if not os.path.exists(p):
             raise HTTPException(404, "no such scene")
         state = await request.json()
-        sc = engine.apply_editor_state(Scene.load(p), state)
+        with engine.lock:
+            sc = engine.apply_editor_state(Scene.load(p), state, keep_unknown=sid in _GENERATING)
         set_selected(sid, state.get("selected"))
         return describe(sc)
 

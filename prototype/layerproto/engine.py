@@ -10,6 +10,7 @@ No model runs on this machine. The servers are started and stopped from the app 
 """
 from __future__ import annotations
 
+import threading
 import time
 from typing import Callable, Optional
 
@@ -28,6 +29,7 @@ Progress = Optional[Callable[[str], None]]
 class Engine:
     def __init__(self, settings: Settings):
         self.s = settings
+        self.lock = threading.RLock()                 # the split (adding layers while it runs) and the editor's autosave both rewrite scene.json
 
     def reconfigure(self, settings: Settings) -> None:
         self.s = settings
@@ -98,12 +100,15 @@ class Engine:
         return self.import_layers(scene, layers, p.names, source=p.method)
 
     # ---- edit one layer ----------------------------------------------------------------------------
-    def edit_layer(self, scene: Scene, layer_id: str, prompt: str, seed: int = 42, progress: Progress = None) -> Scene:
+    def edit_layer(self, scene: Scene, layer_id: str, prompt: str, seed: int = 42, progress: Progress = None, base: int | None = None) -> Scene:
         """Re-prompt / relight one layer with the Qwen-Image-2.1 RGBA edit; the result becomes a new variant and is selected.
         An edit that wiped or flooded the layer is retried with other seeds on the server; if none passed, the closest one is
         kept as a variant (mode `edit-unchecked`) so the user can still look at it."""
         layer = scene.layer(layer_id)
-        v = layer.current()
+        if base is None:
+            self.bake_transform(scene, layer)
+            base = layer.selected
+        v = layer.variants[base] if layer.variants else None
         if v is None:
             raise ValueError("this layer has no image yet")
         cur = Image.open(f"{scene.folder(self.s.scenes_dir)}/{v.file}").convert("RGBA")
@@ -113,7 +118,8 @@ class Engine:
         rel = scene.save_image(self.s.scenes_dir, layer, out, f"v{len(layer.variants):02d}-edit-{seed}")
         layer.variants.append(Variant(file=rel, seed=seed, prompt=prompt, mode="edit" if report.get("accepted", True) else "edit-unchecked",
                                       seconds=round(time.time() - t0, 1), transparent_pct=round(100 * transparent_share(out), 1)))
-        layer.selected = len(layer.variants) - 1
+        if layer.variants[-1].mode == "edit":           # an edit that wiped or flooded the layer stays in the list but is not applied
+            layer.selected = len(layer.variants) - 1
         scene.save(self.s.scenes_dir)
         return scene
 
@@ -149,16 +155,70 @@ class Engine:
         scene.save(self.s.scenes_dir)
         return scene
 
-    def edit_versions(self, scene: Scene, layer_id: str, prompt: str, versions: int = 1, seed: int = 42, progress: Progress = None) -> Scene:
+    def split_stream(self, scene: Scene, image: Image.Image, params: DecomposeParams, versions: int = 1, progress: Progress = None,
+                     role: str = "split"):
+        """Like split_versions, but a generator that yields the scene after every finished layer (qwen21-extract makes one layer per
+        call, so the first layer can be worked on while the others are still being made). Other methods yield once at the end."""
+        names = list(params.names)
+        if params.method != "qwen21-extract" or not names:
+            yield self.split_versions(scene, image, params, versions, progress, role=role)
+            return
+        if self.decomposer_for(role) is None:
+            raise client.NotConnected(f"Not connected to the split server. {client.HOW['split']}")
+        total = len(names) + 1
+        ids: list[str] = []
         for k in range(max(1, int(versions))):
-            self.edit_layer(scene, layer_id, prompt, seed=seed + 1000 * k, progress=progress)
+            for idx in range(total):
+                what = "background" if idx == 0 else names[idx - 1]
+                self._say(progress, f"layer {idx + 1} of {total}: {what}" + (f" (version {k + 1})" if versions > 1 else ""))
+                p = DecomposeParams(**{**params.__dict__, "seed": params.seed + k, "only": idx})
+                t0 = time.time()
+                img = self.decomposer_for(role).decompose(image, p)[0]
+                with self.lock:
+                    scene = Scene.load(f"{scene.folder(self.s.scenes_dir)}/scene.json")     # the editor may have saved meanwhile
+                    if k == 0:
+                        rgba = img.convert("RGBA").resize((self.s.width, self.s.height))
+                        layer = Layer(id=slug(what), name=what, role="background" if idx == 0 else "object", depth=idx, prompt=what)
+                        while any(l.id == layer.id for l in scene.layers):
+                            layer.id += "x"
+                        scene.layers.append(layer)
+                        ids.append(layer.id)
+                        rel = scene.save_image(self.s.scenes_dir, layer, rgba, f"v00-{params.method}")
+                        hist = rgba.split()[-1].histogram()
+                        layer.variants.append(Variant(file=rel, seed=0, prompt=what, mode=params.method, seconds=round(time.time() - t0, 1),
+                                                      transparent_pct=round(100 * sum(hist[:10]) / max(1, sum(hist)), 1)))
+                    else:
+                        self.add_variant(scene, scene.layer(ids[idx]), img, params.method, seed=p.seed, secs=time.time() - t0)
+                    scene.save(self.s.scenes_dir)
+                yield scene
+
+    def bake_transform(self, scene: Scene, layer: Layer) -> None:
+        """A layer moved / resized / rotated in the editor is edited as it is placed (as in Photoshop, where the pixels are what you
+        see): the transform is baked into a new hand version and reset."""
+        v = layer.current()
+        if v is None or not (layer.dx or layer.dy or layer.scale != 1 or getattr(layer, "rot", 0.0)):
+            return
+        cur = Image.open(f"{scene.folder(self.s.scenes_dir)}/{v.file}").convert("RGBA")
+        self.add_variant(scene, layer, self._placed(cur, layer, self.s.width, self.s.height), "hand", seed=len(layer.variants))
+        layer.selected = len(layer.variants) - 1
+        layer.dx = layer.dy = 0.0
+        layer.scale, layer.rot = 1.0, 0.0
+
+    def edit_versions(self, scene: Scene, layer_id: str, prompt: str, versions: int = 1, seed: int = 42, progress: Progress = None) -> Scene:
+        """Every version is an edit of the same starting picture (not of the previous version)."""
+        layer = scene.layer(layer_id)
+        self.bake_transform(scene, layer)
+        base = layer.selected
+        for k in range(max(1, int(versions))):
+            self.edit_layer(scene, layer_id, prompt, seed=seed + 1000 * k, progress=progress, base=base)
         return scene
 
     # ---- the canvas editor (ui/editor.html) saves its whole state here --------------------------------
-    def apply_editor_state(self, scene: Scene, state: dict) -> Scene:
+    def apply_editor_state(self, scene: Scene, state: dict, keep_unknown: bool = False) -> Scene:
         """state = {layers: [{id, name, visible, dx, dy, scale, rot, png?}], selected}, bottom to top (the background first).
         A layer with `png` (a data URL of its full canvas, RGBA) was changed pixel-wise (cut a selection out of it, or created by
-        cutting): it gets a new variant (mode `hand`). Layers missing from the list are removed; the order sets the depth."""
+        cutting): it gets a `hand` variant (a later change of the same layer rewrites that variant, so hand edits do not pile up).
+        Layers missing from the list are removed, unless keep_unknown (the split is still adding layers); the order sets the depth."""
         import base64
         import io
         old = {l.id: l for l in scene.layers}
@@ -175,8 +235,15 @@ class Engine:
             png = d.get("png")
             if png:
                 raw = base64.b64decode(png.split(",", 1)[1] if "," in png else png)
-                self.add_variant(scene, layer, Image.open(io.BytesIO(raw)), "hand", seed=len(layer.variants))
-                layer.selected = len(layer.variants) - 1
+                img = Image.open(io.BytesIO(raw))
+                cur = layer.current()
+                if cur is not None and cur.mode == "hand":      # rewrite the hand variant in place
+                    rgba = img.convert("RGBA").resize((self.s.width, self.s.height))
+                    rgba.save(f"{scene.folder(self.s.scenes_dir)}/{cur.file}")
+                    cur.transparent_pct = round(100 * transparent_share(rgba), 1)
+                else:
+                    self.add_variant(scene, layer, img, "hand", seed=len(layer.variants))
+                    layer.selected = len(layer.variants) - 1
             layer.enabled = bool(d.get("visible", True))
             layer.dx, layer.dy = float(d.get("dx", 0.0)), float(d.get("dy", 0.0))
             layer.scale, layer.rot = max(0.05, float(d.get("scale", 1.0))), float(d.get("rot", 0.0))
@@ -184,6 +251,11 @@ class Engine:
             new_layers.append(layer)
         if new_layers and new_layers[0].role != "background":
             pass                                                # a scene without a background keeps its first layer as it is
+        if keep_unknown:
+            kept = {l.id for l in new_layers}
+            new_layers += [l for l in scene.layers if l.id not in kept]
+            for i, l in enumerate(new_layers):
+                l.depth = i
         scene.layers = new_layers
         scene.save(self.s.scenes_dir)
         return scene

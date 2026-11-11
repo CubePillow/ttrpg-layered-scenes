@@ -48,6 +48,12 @@ NEEDS = {                      # which inputs a method uses: names, boxes, layer
     "qwen-lightning": {"layers", "sampler"}, "sam2-lama": {"names", "boxes", "amodal"}, "reveallayer": {"names", "boxes"}, "cld": {"names", "boxes"},
 }
 EDITOR_JS = "() => { const f = document.getElementById('layer-editor'); if (f && f.contentWindow) f.contentWindow.postMessage({type: 'reload'}, '*'); }"
+# before a model call or a version pick, make the editor save its pending changes (the server reads the stored layer)
+FLUSH_JS = ("() => new Promise(res => { const f = document.getElementById('layer-editor'); if (!f || !f.contentWindow) return res(); "
+            "const h = e => { if (e.data && e.data.type === 'flushed') { removeEventListener('message', h); res(); } }; "
+            "addEventListener('message', h); f.contentWindow.postMessage({type: 'flush'}, '*'); setTimeout(res, 5000); })")
+# runs in the browser before do_edit: the editor saves its pending changes first (cuts, moves), then the inputs are passed on unchanged
+FLUSH_ARGS_JS = "async (...args) => { await (" + FLUSH_JS + ")(); return args; }"
 
 
 # ---------------------------------------------------------------------------- helpers
@@ -69,18 +75,24 @@ def img_path(sc: Scene, file: str) -> str:
     return os.path.join(S.scenes_dir, sc.id, file)
 
 
-def overview(sc: Scene):
-    return [(img_path(sc, l.current().file), f"{l.name}") for l in ENGINE._ordered(sc)[::-1] if l.current()]
+def variant_tiles(sc: Scene, edits_of: str | None = None):
+    """(layer id, variant index, picture path, caption). Default: the versions the splitter made, back to front.
+    edits_of=<layer id>: the Qwen edit versions of that layer. The editor's own changes (mode `hand`) are never listed."""
+    out = []
+    for l in ENGINE._ordered(sc):
+        if edits_of is not None and l.id != edits_of:
+            continue
+        for i, v in enumerate(l.variants):
+            is_edit = v.mode.startswith("edit")
+            if v.mode == "hand" or is_edit != (edits_of is not None):
+                continue
+            out.append((l.id, i, img_path(sc, v.file), f"{l.name} · version {len(out) + 1 if edits_of is not None else i + 1}"
+                        + (" ✔ in use" if i == l.selected else "") + (" (failed the check)" if v.mode == "edit-unchecked" else "")))
+    return out
 
 
-def variants_of(sc: Scene, layer_id: str | None):
-    if not layer_id:
-        return []
-    try:
-        l = sc.layer(layer_id)
-    except (KeyError, StopIteration, ValueError):
-        return []
-    return [(img_path(sc, v.file), f"#{i} {v.mode}" + (" ✔" if i == l.selected else "")) for i, v in enumerate(l.variants)]
+def version_gallery(sc: Scene, edits_of: str | None = None):
+    return [(p, cap) for _l, _i, p, cap in variant_tiles(sc, edits_of)]
 
 
 def editor_html(sid: str | None) -> str:
@@ -221,38 +233,53 @@ def on_preset(label, preset):
     return gr.skip(), gr.skip(), gr.skip(), gr.skip(), gr.skip()
 
 
-def split_outputs(sc: Scene, status: str):
-    return sc.id, editor_html(sc.id), overview(sc), [], status
+NO_SCENE = (None, editor_html(None), [])
 
 
 def do_split(pic, prompt, label, names_csv, boxes_json, n_layers, res, steps, sampler, amodal, versions, progress=gr.Progress()):
+    """Generator: the editor opens at once and every layer appears in it (and in the version row) as soon as it is made."""
     import json as _json
     if pic is None:
-        return (None, editor_html(None), [], [], "Make or upload a picture first.")
+        yield (*NO_SCENE, "Make or upload a picture first.")
+        return
     prof, method, role = method_of(label)
     names = [n.strip() for n in (names_csv or "").split(",") if n.strip()]
     need = NEEDS[method]
     if "names" in need and "boxes" not in need and not names:
-        return (None, editor_html(None), [], [], "Name the objects to extract, comma separated, back to front (e.g. cottage, big tree, red fox).")
+        yield (*NO_SCENE, "Name the objects to extract, comma separated, back to front (e.g. cottage, big tree, red fox).")
+        return
     try:
         boxes = _json.loads(boxes_json) if boxes_json and str(boxes_json).strip() else []     # hidden inputs arrive as None
     except (ValueError, TypeError) as e:
-        return (None, editor_html(None), [], [], f"The boxes are not valid JSON: {e}")
+        yield (*NO_SCENE, f"The boxes are not valid JSON: {e}")
+        return
+    sc = Scene(id=new_scene_id(prompt or "scene"), user_input=prompt or "", refined_prompt=prompt or "", n_layers=int(n_layers))
+    sc.save(S.scenes_dir)
+    sid = sc.id
+
+    def say(m):
+        editor_api.set_generating(sid, m)
+        progress(0, desc=m)
+
+    editor_api.set_generating(sid, "starting the split")
+    yield sid, editor_html(sid), [], "Making the layers; each one appears in the editor as soon as it is done."
     try:
-        sc = Scene(id=new_scene_id(prompt or "scene"), user_input=prompt or "", refined_prompt=prompt or "", n_layers=int(n_layers))
         p = DecomposeParams(caption=prompt or "", method=method, n_layers=int(n_layers), boxes=boxes, names=names, amodal=bool(amodal),
                             resolution=int(res), steps=int(steps), sampler=sampler)
-        ENGINE.split_versions(sc, pic.convert("RGB"), p, versions=int(versions), progress=lambda m: progress(0, desc=m), role=role)
-        return split_outputs(sc, f"Scene `{sc.id}`: {len(sc.layers)} layers, {int(versions)} version(s) each. Work on them in the editor below.")
+        for sc in ENGINE.split_stream(sc, pic.convert("RGB"), p, versions=int(versions), progress=say, role=role):
+            yield sid, gr.skip(), version_gallery(sc), f"Scene `{sid}`: {len(sc.layers)} layer(s) so far."
+        yield sid, gr.skip(), version_gallery(load(sid)), f"Scene `{sid}` done: {len(sc.layers)} layers. Work on them in the editor below."
     except Exception as e:  # noqa: BLE001
-        return (None, editor_html(None), [], [], err(e))
+        yield sid, gr.skip(), version_gallery(load(sid)), err(e)
+    finally:
+        editor_api.set_generating(sid, None)
 
 
 def do_load(name):
     if not name or name not in scene_list():
-        return (None, editor_html(None), [], [], "Pick a saved scene.")
+        return (*NO_SCENE[:1], editor_html(None), [], "Pick a saved scene.")
     sc = load(name)
-    return split_outputs(sc, f"Loaded `{sc.id}`.")
+    return sc.id, editor_html(sc.id), version_gallery(sc), f"Loaded `{sc.id}`."
 
 
 # ---------------------------------------------------------------------------- 3. layers
@@ -260,46 +287,59 @@ def selected_layer(sid):
     return editor_api.selected(sid) if sid else None
 
 
-def refresh_galleries(sid, last):
-    """Timer: show the variants of the layer picked in the editor (only when something changed, so nothing flickers)."""
-    if not sid or not os.path.exists(os.path.join(S.scenes_dir, sid, "scene.json")):
-        return gr.skip(), gr.skip(), last
-    sc = load(sid)
-    lid = selected_layer(sid)
-    sig = (sid, lid, tuple((l.id, len(l.variants), l.selected) for l in sc.layers))
-    if sig == last:
-        return gr.skip(), gr.skip(), last
-    return overview(sc), variants_of(sc, lid), sig
-
-
 def do_pick_variant(sid, evt: gr.SelectData):
-    lid = selected_layer(sid)
+    """A split version picked in the row under the split: it becomes that layer's picture in the editor."""
+    if not sid:
+        return gr.skip(), "Split a picture first."
+    sc = load(sid)
+    tiles = variant_tiles(sc)
+    if not 0 <= evt.index < len(tiles):
+        return gr.skip(), gr.skip()
+    lid, idx = tiles[evt.index][:2]
+    sc = ENGINE.select(sc, lid, idx)
+    return version_gallery(sc), f"'{sc.layer(lid).name}': split version {idx + 1} is now the layer in the editor."
+
+
+def do_pick_edit(sid, lid, evt: gr.SelectData):
+    """An edit version picked in the row under 'Edit the picked layer'."""
     if not sid or not lid:
-        return gr.skip(), gr.skip(), "Pick a layer in the editor first."
-    sc = ENGINE.select(load(sid), lid, evt.index)
-    return overview(sc), variants_of(sc, lid), f"Variant {evt.index} of '{sc.layer(lid).name}' selected."
+        return gr.skip(), gr.skip(), "Edit a layer first."
+    sc = load(sid)
+    tiles = variant_tiles(sc, lid)
+    if not 0 <= evt.index < len(tiles):
+        return gr.skip(), gr.skip(), gr.skip()
+    sc = ENGINE.select(sc, lid, tiles[evt.index][1])
+    return version_gallery(sc), version_gallery(sc, lid), f"Edit version {evt.index + 1} of '{sc.layer(lid).name}' is now the layer in the editor."
 
 
 def do_edit(sid, prompt, versions, seed, progress=gr.Progress()):
     lid = selected_layer(sid)
     if not sid or not lid:
-        return gr.skip(), gr.skip(), "Pick a layer in the editor first (click it in the picture or in the layer list)."
+        return gr.skip(), gr.skip(), gr.skip(), "Pick a layer in the editor first (click it in the picture or in the layer list)."
     if not str(prompt).strip():
-        return gr.skip(), gr.skip(), "Describe the change."
+        return gr.skip(), gr.skip(), gr.skip(), "Describe the change."
     try:
-        sc = ENGINE.edit_versions(load(sid), lid, str(prompt).strip(), versions=int(versions), seed=int(seed), progress=lambda m: progress(0, desc=m))
-        v = sc.layer(lid).current()
-        note = "" if v.mode == "edit" else " ⚠️ no seed passed the transparency check; compare the variants."
-        return overview(sc), variants_of(sc, lid), f"Edited '{sc.layer(lid).name}' ({int(versions)} version(s)); the last one is shown, pick another in the variants row.{note}"
+        with ENGINE.lock:
+            sc = load(sid)
+        n_before = len(sc.layer(lid).variants)
+        sc = ENGINE.edit_versions(sc, lid, str(prompt).strip(), versions=int(versions), seed=int(seed), progress=lambda m: progress(0, desc=m))
+        l = sc.layer(lid)
+        new = [v for v in l.variants[n_before:] if v.mode.startswith("edit")]
+        ok = sum(v.mode == "edit" for v in new)
+        if ok:
+            note = f"Edited '{l.name}': {ok} of {len(new)} version(s) passed the check; the last good one is in the editor, the others are in the version row above."
+        else:
+            note = (f"⚠️ '{l.name}' was NOT changed: the {len(new)} edit(s) did not pass the transparency check (the result lost or flooded the layer). "
+                    "They are in the version row above (marked failed); try another wording or seed.")
+        return version_gallery(sc), version_gallery(sc, lid), lid, note
     except Exception as e:  # noqa: BLE001
-        return gr.skip(), gr.skip(), err(e)
+        return gr.skip(), gr.skip(), gr.skip(), err(e)
 
 
 # ---------------------------------------------------------------------------- layout
 with gr.Blocks(title="Layer scene prototype") as demo:
     scene_id = gr.State(None)
     cands = gr.State([])
-    last_sig = gr.State(None)
     gr.Markdown("# Layer scene prototype\nAll models run on a Kaggle GPU session that this app starts for you; nothing runs on this computer.")
 
     with gr.Accordion("Kaggle session", open=True):
@@ -384,13 +424,14 @@ with gr.Blocks(title="Layer scene prototype") as demo:
     alt_stop.click(lambda: do_stop("alt"), None, [servers_md])
 
     # ------------------------------------------------------------------ 3. layers, then the editor
+    variants = gr.Gallery(label="Versions (click to use): what the split made for each layer", columns=4, rows=1, height=360,
+                          object_fit="contain", allow_preview=False)
+
     gr.Markdown("## 3. Work on the layers")
-    with gr.Row():
-        over = gr.Gallery(label="All layers (top first)", columns=6, height=190, allow_preview=False)
-        variants = gr.Gallery(label="Variants of the layer picked in the editor (click to select)", columns=5, height=190, allow_preview=False)
     gr.Markdown("**Final image and layer editor.** Click a layer in the picture or the list. **Move** drags the layer (corner handles resize, the round handle rotates); "
-                "**Rectangle / lasso** select an area, then drag inside it to move just that part (or *Cut to new layer*). Everything is saved as you go; "
-                "*Export PNG* downloads the composite.")
+                "**Rectangle / lasso** select an area of the active layer: drag inside it to move just that part within the layer, "
+                "*Delete selected part* removes it from the layer (for objects the splitter put on the wrong layer), *Cut to new layer* makes a layer of it. "
+                "Everything is saved as you go; *Export PNG* downloads the composite.")
     editor = gr.HTML(editor_html(None))
     with gr.Row():
         edit_prompt = gr.Textbox(label="Change the picked layer (Qwen-Image-2.1 edit, about 25 s per version)", lines=2, scale=4,
@@ -398,15 +439,17 @@ with gr.Blocks(title="Layer scene prototype") as demo:
         versions3 = gr.Slider(1, 4, value=1, step=1, label="Versions", scale=1)
         edit_seed = gr.Number(42, label="Seed", precision=0, scale=1)
         edit_btn = gr.Button("Edit the picked layer", variant="primary", scale=2)
+    edit_gallery = gr.Gallery(label="Versions (click to use): the edits of the picked layer", columns=4, rows=1, height=360,
+                              object_fit="contain", allow_preview=False)
+    edit_status = gr.Markdown()
+    edit_lid = gr.State(None)
 
     split_btn.click(do_split, [pic, prompt, splitter, names_csv, boxes_json, n_layers, res, steps2, sampler, amodal, versions2],
-                    [scene_id, editor, over, variants, status])
-    load_btn.click(do_load, [old], [scene_id, editor, over, variants, status])
-    edit_btn.click(do_edit, [scene_id, edit_prompt, versions3, edit_seed], [over, variants, status]).then(None, None, None, js=EDITOR_JS)
-    variants.select(do_pick_variant, [scene_id], [over, variants, status]).then(None, None, None, js=EDITOR_JS)
-    gal_timer = gr.Timer(2)
-    gal_timer.tick(refresh_galleries, [scene_id, last_sig], [over, variants, last_sig])
-
+                    [scene_id, editor, variants, status])
+    load_btn.click(do_load, [old], [scene_id, editor, variants, status])
+    edit_btn.click(do_edit, [scene_id, edit_prompt, versions3, edit_seed], [variants, edit_gallery, edit_lid, edit_status], js=FLUSH_ARGS_JS)         .then(None, None, None, js=EDITOR_JS)
+    variants.select(do_pick_variant, [scene_id], [variants, edit_status]).then(None, None, None, js=EDITOR_JS)
+    edit_gallery.select(do_pick_edit, [scene_id, edit_lid], [variants, edit_gallery, edit_status]).then(None, None, None, js=EDITOR_JS)
 
 def build_app():
     """FastAPI app with the editor routes next to the Gradio UI (the editor and its pictures are plain routes, not Gradio components)."""
