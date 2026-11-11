@@ -1,0 +1,61 @@
+model,task,scene,hardware,settings,seconds,peak_gb,layers,recomposite_diff,result_dir,date,note
+Qwen-Image-Layered,image to layers,forest,2x T4,"640 px, 4 layers, 50 steps, CFG 4",2100,8.8,4,4.1,results_qwen_batch_v2,2026-11-09,defaults
+Qwen-Image-Layered,image to layers,forest,2x T4,"384 px, 3 layers, 3 steps, CFG 1",20,8.0,3,,results_qwen_sweep_v5,2026-11-09,softer edges
+Qwen-Image-Layered,image to layers,forest,2x T4,"384 px, 4 layers, 4 steps, CFG 1",30,8.0,4,7.1,results_qwen_sweep_v5,2026-11-09,recommended
+Qwen-Image-Layered,image to layers,pixel-art camp,2x T4,"384 px, 4 layers, 5 steps, CFG 1",38,8.0,4,,results_qwen_sweep_v5,2026-11-09,
+Qwen-Image-Layered,image to layers,forest,2x T4,"512 px, 3 layers, 3 steps, CFG 1",31,8.0,3,,results_qwen_sweep_v5,2026-11-09,sharper
+Stable-Layers,image to layers,forest,2x T4,"384 px, 4 layers, 4 Euler steps, CFG 1",34,,4,15-18,results_stable_layers_v8,2026-11-09,colour shift
+Stable-Layers,image to layers,forest,2x T4,"384 px, 4 layers, 8 Euler steps, CFG 1",71,,4,,results_stable_layers_v8,2026-11-09,
+Qwen Lightning LoRA 1.0,image to layers,3 scenes,2x T4,"384 px, 4 layers, 4 steps",38,,4,11-13.5,results_qwen_sweep_v6_lightning,2026-11-09,thin subjects separate better
+RevealLayer,image + boxes to layers,forest,2x T4,"512 px, 3 boxes, 12 steps, true_gs 1",134,11.4,3+bg,,results_reveallayer_v11,2026-11-09,hidden areas filled
+Qwen-Image-2.1 Turbo,text to RGBA object,campfire,2x T4,"512 px, 8 steps",20,9.7,1,,results_qwen21_v2,2026-11-09,dark halo
+Qwen-Image-2.1 Turbo,edit RGBA layer,campfire,2x T4,"512 px, 8 steps",23,10.7,1,,results_qwen21_v2,2026-11-09,alpha kept
+Qwen-Image-2.1 Turbo,extract object,forest,2x T4,"512 px, 8 steps",22,10.7,1,,results_qwen21_v2,2026-11-09,clean in-place layer
+FLUX.1-dev GGUF Q4 (control),text to image,campfire,1x T4,"512 px, 16 steps, plain fp16",41,7.5,,,results_flux_control_v1,2026-11-09,no overflow
+LayerDiffuse SDXL chain,add element to scene,forest,1x T4,"1024 px, 20 steps, CFG 7",18,,1,,layerproto-chain-batch,2026-11-07,per pass
+relocate() v5,move/resize layer,forest,1x T4,"512 px, 20 steps, strength 0.3",4,,1,,results_qwen_relocate_v5_fixedpin,2026-11-09,identity largely kept
+SAM2 + LaMa,image to layers,3 scenes,1x T4,"hiera-small, 4 largest masks",5,,4,0.2-2.4,results_segment_inpaint,2026-11-09,poor automatic grouping
+LayerD,image to layers,3 scenes,Kaggle CPU,defaults,60,,1,,results_layerd_trial,2026-11-09,returned 1 layer
+IC-Light fbc relight,relight layer,forest,laptop CPU,"384 px, 8 steps",44,,1,,results_local_relight,2026-11-09,fire also dimmed
+procedural shadow,shadow layer,forest,laptop CPU,per layer,0.6,,1,,results_local_shadow,2026-11-09,
+LayerDiffuse-Flux,text to RGBA object,campfire / deer / bottle,1x T4,"512 px, 16 steps, GGUF Q4",58,8.9,1,,results_ldflux_v4,2026-11-09,semi-transparent glass works
+Stable-Layers (Heun),image to layers,forest,2x T4,"384 px, 4 layers, 4 Heun steps, CFG 1",58,,4,17.9,results_qwen_v9b,2026-11-09,very clean background
+Stable-Layers (Heun),image to layers,forest,2x T4,"384 px, 4 layers, 8 Heun steps, CFG 1",130,,4,14.8,results_qwen_v9b,2026-11-09,
+Qwen-Image-Layered (Heun),image to layers,forest,2x T4,"384 px, 4 layers, 4 Heun steps, CFG 1",58,,4,7.0,results_qwen_v9b,2026-11-09,
+Qwen-Image-Layered,image to layers,3 scenes,2x T4,"384 px, 2 layers, 4 steps, CFG 1",26,,2,5.9-6.5,results_qwen_v9b,2026-11-09,bg + one fg layer
+Qwen-Image-Layered,image to layers,fox & cottage,2x T4,"384 px, 4 layers, 4 steps, CFG 1",33,,4,9.4,results_qwen_fox_v11,2026-11-09,bg / roof / cottage+tree / fox
+Qwen-Image-Layered,image to layers,fox & cottage,2x T4,"384 px, 6 layers, 4 steps, CFG 1",41,,6,17.3,results_qwen_fox_v11,2026-11-09,
+Qwen-Image-Layered,image to layers,fox & cottage,2x T4,"512 px, 5 layers, 4 steps, CFG 1",62,,5,13.4,results_qwen_fox_v11,2026-11-09,tree and fox separate
+Stable-Layers,image to layers,fox & cottage,2x T4,"384 px, 5 layers, 4 Euler steps, CFG 1",39,,5,21.0,results_qwen_fox_v11,2026-11-09,sky / meadow / cottage+tree / path / fox
+Stable-Layers (Heun),image to layers,fox & cottage,2x T4,"384 px, 5 layers, 4 Heun steps, CFG 1",67,,5,20.6,results_qwen_fox_v11,2026-11-09,same clean split
+ART+,text + boxes to layers,forest / sketch prompts,2x T4,"512 px, 16 steps, CFG 4",315,10.0,4,,results_artplus_v5,2026-11-09,runs; output wrong (small image, opaque boxes)
+SAM2 + LaMa (hand boxes),image to layers,fox & cottage,1x T4,"SAM2 hiera-small box prompts, LaMa",8,,6,1.27,results_segment_inpaint_v2,2026-11-10,houses / cottage / gate / tree / fox; blurry bg fill
+SAM2 + LaMa (Grounding DINO nouns),image to layers,fox & cottage,1x T4,"Grounding DINO tiny + SAM2 + LaMa",7,,6,1.30,results_segment_inpaint_v2,2026-11-10,fully automatic; missed village houses
+SAM2 + LaMa (auto masks),image to layers,fox & cottage,1x T4,"automatic, 5 largest",9,,6,,results_segment_inpaint_v2,2026-11-10,fragments
+RevealLayer,image + boxes to layers,fox & cottage,2x T4,"512 px, 5 boxes, 12 steps, true_gs 1",140,11.2,5+bg,,results_reveallayer_fox_v15,2026-11-10,filled bg + cottage / gate / tree / fox
+RevealLayer,image + boxes to layers,fox & cottage,2x T4,"512 px, 5 boxes, 16 steps, true_gs 3.5",334,11.2,5+bg,,results_reveallayer_fox_v15,2026-11-10,slightly cleaner edges
+Qwen-Image-2.1 Turbo,extract object,fox & cottage,2x T4,"512 px, 8 steps",27,10.7,1,,results_qwen21_fox,2026-11-10,clean fox in place
+Qwen-Image-2.1 Turbo,edit RGBA layer (fox to wolf),fox & cottage,2x T4,"512 px, 8 steps",21,10.7,1,,results_qwen21_fox,2026-11-10,alpha kept
+Qwen-Image-2.1 Turbo,scene event edit (night / rain),fox & cottage,2x T4,"512 px, 8 steps",22,10.7,,,results_qwen21_fox,2026-11-10,strong; composition kept
+relocate() + shadow + IC-Light,move/resize layer,fox_cottage,1x T4,"512 px, 20 steps, strength 0.3, paste-back 0.8, on RevealLayer layers",9,,1,,results_fox_move_v2,2026-11-10,"no hole; relocate 3.4 s, shadow 0.04 s, IC-Light 5.9 s; IC-Light reddens"
+LayerD,image to layers,design_flat,Kaggle CPU,"defaults, 3 iterations",206,,3,0.18,results_layerd_v10,2026-11-10,"control image in its design domain; fox & forest: 1 layer, matting empty"
+ART+,text+boxes to layers,skeleton campfire (repo case 1),1x T4,"512 px, 16 steps, CFG 4, GGUF Q4_K_S, 3 stacked LoRAs",294,8.4,4,,results_artplus_v9,2026-11-10,"clean transparent layers + background"
+ART+,text+boxes to layers,fox_cottage,1x T4,"512 px, 16 steps, CFG 4, cartoon prefix, 5 JSON boxes",353,8.6,6,,results_artplus_v10,2026-11-10,"clean object per box; white background; gate arch became a car"
+LayerD + generic BiRefNet,image to layers,fox_cottage,Kaggle CPU,"ZhengPeng7/BiRefNet matting, 4 iterations",220,,4,0.57,results_layerd_v11,2026-11-10,"fox peeled cleanly; rest of scene one layer"
+ART+,text+boxes to layers,fox_cottage,1x T4,"512 px, 16 steps, painting prefix + background sentence",343,8.6,6,,results_artplus_v11,2026-11-10,"flat blue background; objects still vignettes"
+CLD,image+boxes to layers,fox_cottage,2x T4,"512 px, 16 steps, CFG 4, adapter 0.9, GGUF Q4_K_S, 3 LoRAs + adapter",376,13.2,5,,results_cld_v3,2026-11-10,"clean layers + inpainted background"
+SAM2 + SDXL-inpaint fill,image to layers,fox_cottage,1x T4,"5 hand boxes, SDXL inpaint 1024 px 30 steps",28,,6,4.65,results_segment_inpaint_v3,2026-11-10,"sharp in-style background; invents content"
+Stable-Layers + Heun,image to layers,q21_night (Qwen-2.1 edit),2x T4,"384 px, 5 layers, 4 steps",67.4,,4,4.16,results_qwen_v10,2026-11-10,"story-event re-split: moon / cottage / tree / fox"
+Stable-Layers + Heun,image to layers,q21_rain (Qwen-2.1 edit),2x T4,"384 px, 5 layers, 4 steps",70.0,,4,11.16,results_qwen_v10,2026-11-10,"story-event re-split"
+Qwen-Image-Layered + Lightning 1.0,image to layers,fox_cottage,2x T4,"384 px, 5 layers, 2 steps",22.4,,5,14.98,results_qwen_v10,2026-11-10,"half the time; cottage layer nearly empty"
+Qwen-Image-Layered + Lightning 0.5,image to layers,fox_cottage,2x T4,"384 px, 5 layers, 4 steps",43.6,,5,11.09,results_qwen_v10,2026-11-10,"cleanest Lightning variant; no speed-up"
+LayerDiffuse chain,text to layers (7 elements),village scene,1x T4,"1024 px, 20 steps, CFG 7, SDXL base",364,,8,,results_chain_complex,2026-11-10,"clean layers; layout/scale uncontrolled; 48 s per element"
+LayerDiffuse chain,text to layers (7 elements),village scene,1x T4,"512 px, 20 steps, CFG 7",244,,8,,results_chain_complex,2026-11-10,"garbled at 512 px"
+Stable-Layers + Heun,image to layers,flux_campfire (FLUX.1-dev),2x T4,"384 px, 4 layers, 4 steps",57.0,,3,11.01,results_qwen_v11,2026-11-10,"cleanest split: trees / campfire / empty clearing"
+Qwen-Image-Layered,image to layers,flux_campfire (FLUX.1-dev),2x T4,"384 px, 4 layers, 4 steps",32.0,,3,6.33,results_qwen_v11,2026-11-10,"frames mostly empty"
+Stable-Layers + Heun,image to layers,q21_t2i (Qwen-Image-2.1),2x T4,"384 px, 5 layers, 4 steps",65.8,,4,21.23,results_qwen_v11,2026-11-10,"arch+path / cottage / tree / fox"
+CLD,image+boxes to layers,q21_night / q21_rain (Qwen-2.1 edits),2x T4,"512 px, 16 steps, 5 boxes",360,13.2,5,,results_cld_v4,2026-11-10,"layers keep the edit look; invented background"
+Qwen-Image-Layered (decompose-recompose cycle x5),drift building block,fox_cottage,2x T4,"384 px, 5 layers, 4 steps",36,,5,,results_qwen_v12,2026-11-10,"PSNR vs original 21.4 -> 15.5 dB after 5 cycles (base); 20.1 -> 9.2 (Stable-Layers)"
+CLD,image+boxes to layers,fox_cottage (7 boxes),2x T4,"512 px, 16 steps, 7 boxes",434,13.3,7,,results_cld_v5,2026-11-10,"hedge clean; ground path not extractable"
+Qwen-Image-2.1 per-layer relight,story event per_layer,fox_cottage layers,2x T4,"512 px, 8 steps turbo, 5 layers x 2 events",23,,5,,results_perlayer,2026-11-10,"alpha kept on 6 of 10 edits; much better darkening than IC-Light where it works"
+Qwen-Image-2.1 per-layer relight + alpha retry,story event per_layer,fox_cottage layers,2x T4,"512 px, 5 layers x 2 events, up to 4 seeds",140,,5,,results_perlayer_v2,2026-11-10,"10 of 10 edits accepted (4 on 2nd try); 20-26 s per try"
