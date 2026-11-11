@@ -30,3 +30,14 @@ generated/
 .idea/
 .DS_Store
 Thumbs.db
+
+# ---------- Prototype (Python) ----------
+__pycache__/
+*.pyc
+prototype/config.json
+prototype/scenes/
+prototype/crash.log
+prototype/kaggle/upload_*/
+prototype/kaggle/results_*/
+prototype/kaggle/*.zip
+prototype/vendor/diffuser_layerdiffuse/

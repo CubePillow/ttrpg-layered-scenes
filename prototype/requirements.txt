@@ -1,0 +1,6 @@
+# Everything the app needs on your own computer. No model runs here: the models run on Kaggle GPU servers the app starts for you.
+gradio>=5
+pillow
+numpy
+requests
+kaggle>=2.0   # starts and stops the Kaggle notebooks with your own account (credentials: ~/.kaggle/kaggle.json or access_token)
