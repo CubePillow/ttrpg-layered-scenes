@@ -36,6 +36,8 @@ Both models live in **one** Kaggle session (profile `studio`): one Start, one id
 5. **3. Work on the layers:** the *All layers* and *Variants* rows are above the editor; the variants row follows the layer you pick in the editor (click a variant to switch the layer to it). The **editor** works like Krita / GIMP: *Move* drags the layer under the pointer (or the picked one), corner handles resize, the round handle rotates; *Rectangle* and *Lasso* select an area of the picked layer, then drag inside the selection to move just that part (it becomes a new layer) or use *Cut to new layer* / *Erase selection*; the layer list shows / hides, reorders and deletes layers; *Undo* (Ctrl+Z), *Reset layer*, *Export PNG*. The picture is composited in the browser, so moving never reloads it, and every change is saved as you go. **Edit the picked layer** (Qwen-Image-2.1, about 25 s per version) adds variants to the layer you picked in the editor.
 6. Scenes are saved in `prototype/scenes/<id>/` (load one with the dropdown). **Stop** the session when you are done; it also stops itself after 20 idle minutes (`idle_minutes` in `config.json`). Idle time counts against your weekly Kaggle quota like any other running time.
 
+Step-by-step runs with every input filled in (fox & cottage from text, skeleton & campfire from a sketch): [../docs/guides/example-runs.md](../docs/guides/example-runs.md).
+
 ## How the pieces find each other
 
 - The app builds the serve notebook for the profile (`layerproto/serve/notebook.py`) with a fresh random token and a private random topic, pushes it with the Kaggle API (`layerproto/kaggle_launch.py`) and waits.
