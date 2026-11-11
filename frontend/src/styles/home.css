@@ -1,0 +1,272 @@
+/* ---------- Pixel frame: square, stepped corners drawn with box-shadows */
+.pixel-box {
+  background: rgba(15, 11, 26, 0.82);
+  box-shadow:
+    0 -4px 0 0 var(--border),
+    0 4px 0 0 var(--border),
+    -4px 0 0 0 var(--border),
+    4px 0 0 0 var(--border),
+    inset 0 4px 0 0 rgba(255, 255, 255, 0.04);
+}
+
+/* ---------- Hero */
+.hero {
+  position: relative;
+  min-height: 100svh;
+  display: grid;
+  padding: 40px clamp(16px, 5vw, 72px);
+  overflow: hidden;
+}
+
+.hero-scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 67% 100%;
+  image-rendering: pixelated;
+  z-index: 0;
+}
+
+.hero-panel {
+  position: relative;
+  z-index: 1;
+  align-self: center;
+  max-width: 560px;
+  padding: 28px;
+}
+
+.eyebrow {
+  font-family: var(--pixel);
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-bottom: 18px;
+}
+
+.title {
+  font-family: var(--pixel);
+  font-size: clamp(18px, 2.6vw, 30px);
+  line-height: 1.6;
+  font-weight: 400;
+  color: var(--heading);
+  text-shadow: 3px 3px 0 var(--ink);
+}
+
+.accent {
+  color: var(--accent);
+}
+
+.lede {
+  margin-top: 18px;
+  font-size: 19px;
+  color: var(--text);
+  max-width: 46ch;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 20px;
+  margin-top: 26px;
+}
+
+/* ---------- Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px;
+  padding: 14px 18px;
+  border: 0;
+  font-family: var(--pixel);
+  font-size: 11px;
+  line-height: 1;
+  text-decoration: none;
+  color: var(--text);
+  background: var(--panel-2);
+  cursor: pointer;
+  box-shadow:
+    0 -4px 0 0 var(--ink),
+    0 4px 0 0 var(--ink),
+    -4px 0 0 0 var(--ink),
+    4px 0 0 0 var(--ink),
+    inset -4px -4px 0 0 rgba(0, 0, 0, 0.35),
+    inset 4px 4px 0 0 rgba(255, 255, 255, 0.08);
+  transition: transform 80ms steps(2);
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(2px);
+}
+
+.btn-primary {
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+
+.btn-primary:hover {
+  background: var(--accent-hot);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  color: var(--text-dim);
+}
+
+.soon {
+  font-size: 8px;
+  padding: 4px 5px;
+  background: var(--border);
+  color: var(--text);
+}
+
+/* ---------- Layer bar */
+.layer-bar {
+  display: grid;
+  gap: 10px;
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 2px dashed var(--border);
+}
+
+.layer-bar-label {
+  font-family: var(--pixel);
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.chip-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.chip-group-name {
+  min-width: 64px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  padding: 8px 12px;
+  border: 0;
+  font-family: var(--body);
+  font-size: 16px;
+  color: var(--text);
+  background: var(--panel-2);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 2px var(--border);
+}
+
+.chip:hover,
+.chip-on {
+  color: var(--accent-ink);
+  background: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent-hot);
+}
+
+.layer-prompt {
+  min-height: 1.5em;
+  font-size: 17px;
+  color: var(--text-dim);
+}
+
+.prompt-key {
+  color: var(--accent);
+}
+
+/* ---------- How it works */
+.how {
+  padding: 72px clamp(16px, 5vw, 72px) 56px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.section-title {
+  font-family: var(--pixel);
+  font-size: clamp(16px, 2vw, 22px);
+  font-weight: 400;
+  color: var(--heading);
+  margin-bottom: 36px;
+}
+
+.steps {
+  list-style: none;
+  padding: 4px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 28px;
+}
+
+.step {
+  padding: 22px;
+  background: var(--panel);
+}
+
+.step-num {
+  display: block;
+  font-family: var(--pixel);
+  font-size: 14px;
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+
+.step-title {
+  font-family: var(--pixel);
+  font-size: 11px;
+  line-height: 1.6;
+  font-weight: 400;
+  color: var(--heading);
+  margin-bottom: 12px;
+}
+
+.step p {
+  color: var(--text);
+}
+
+/* ---------- Footer */
+.footer {
+  padding: 24px clamp(16px, 5vw, 72px) 40px;
+  font-size: 15px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* ---------- Small screens */
+@media (max-width: 640px) {
+  .hero {
+    /* panel on top, the scene shows through underneath */
+    grid-template-rows: auto minmax(240px, 1fr);
+    padding-top: 24px;
+  }
+
+  .hero-panel {
+    align-self: start;
+    padding: 20px;
+  }
+
+  .lede {
+    font-size: 17px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
+}

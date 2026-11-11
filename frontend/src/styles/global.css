@@ -1,0 +1,52 @@
+:root {
+  --bg: #0f0c16;
+  --panel: #171226;
+  --panel-2: #211936;
+  --ink: #07060c;
+  --border: #3d2b5e;
+  --text: #d9d0ef;
+  --text-dim: #9d92bb;
+  --heading: #fff6d8;
+  --accent: #ff9a3c;
+  --accent-hot: #ffe08a;
+  --accent-ink: #2a1206;
+  --focus: #e8f27a;
+
+  --pixel: 'Press Start 2P', ui-monospace, Consolas, monospace;
+  --body: 'Pixelify Sans', ui-monospace, Consolas, monospace;
+
+  font: 18px/1.5 var(--body);
+  color-scheme: dark;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: none;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  min-width: 320px;
+}
+
+h1,
+h2,
+h3,
+p,
+ol {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
