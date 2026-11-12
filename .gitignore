@@ -30,3 +30,8 @@ generated/
 .idea/
 .DS_Store
 Thumbs.db
+
+# ---------- Backend tests ----------
+backend/tests/output/
+backend/tests/image/*
+!backend/tests/image/README.md
