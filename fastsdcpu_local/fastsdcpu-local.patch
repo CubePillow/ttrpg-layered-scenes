@@ -1,0 +1,44 @@
+diff --git a/configs/lcm-models.txt b/configs/lcm-models.txt
+index 0162aa4..41d1d7c 100644
+--- a/configs/lcm-models.txt
++++ b/configs/lcm-models.txt
+@@ -3,4 +3,6 @@ rupeshs/sdxs-512-0.9-orig-vae
+ rupeshs/hyper-sd-sdxl-1-step
+ rupeshs/SDXL-Lightning-2steps
+ stabilityai/sdxl-turbo
+-SimianLuo/LCM_Dreamshaper_v7
+\ No newline at end of file
++SimianLuo/LCM_Dreamshaper_v7
++models/sdxl-turbo
++models/sd-turbo
+\ No newline at end of file
+diff --git a/configs/stable-diffusion-models.txt b/configs/stable-diffusion-models.txt
+index d5d21c9..2ac6d5f 100644
+--- a/configs/stable-diffusion-models.txt
++++ b/configs/stable-diffusion-models.txt
+@@ -4,4 +4,5 @@ stabilityai/stable-diffusion-xl-base-1.0
+ runwayml/stable-diffusion-v1-5
+ segmind/SSD-1B
+ stablediffusionapi/anything-v5
+-prompthero/openjourney-v4
+\ No newline at end of file
++prompthero/openjourney-v4
++stable-diffusion-v1-5/stable-diffusion-v1-5
+\ No newline at end of file
+diff --git a/src/backend/lcm_text_to_image.py b/src/backend/lcm_text_to_image.py
+index f89c864..a463794 100644
+--- a/src/backend/lcm_text_to_image.py
++++ b/src/backend/lcm_text_to_image.py
+@@ -514,6 +514,12 @@ class LCMTextToImage:
+ 
+             if not self.use_openvino and not is_openvino_device():
+                 self._pipeline_to_device()
++            elif not self.use_openvino:
++                # transformers>=5 keeps the stored (fp16) dtype for text encoders,
++                # so cast every component explicitly to avoid Half/Float mismatches
++                for component in self.pipeline.components.values():
++                    if isinstance(component, torch.nn.Module):
++                        component.to(dtype=self.torch_data_type)
+ 
+             if not self._is_hetero_pipeline():
+                 if (

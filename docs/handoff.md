@@ -4,7 +4,7 @@
 
 ## 1. What this is
 
-A free, non-commercial prototype for a storytelling game: **text prompt → coherent layered scene → edit single layers (re-prompt, move, resize) → recomposite → story events change the scene**. Hardware: a Windows laptop (CPU) and Kaggle (2× T4, fp16 only, 30 GPU-hours a week, at most two GPU sessions at once). No user study is planned; the prototype and its measurements are the result ([research/research-gap.md](research/research-gap.md)). Everything in this repo (code, experiments, research notes, decisions) is on GitHub: `github.com/MarkAndreDuesing/layer-prototype-trim` (the trimmed hand-off copy of `layer-prototype`).
+A free, non-commercial prototype for a storytelling game: **text prompt → coherent layered scene → edit single layers (re-prompt, move, resize) → recomposite → story events change the scene**. Hardware: a Windows laptop (CPU) and Kaggle (2× T4, fp16 only, 30 GPU-hours a week, at most two GPU sessions at once). No user study is planned; the prototype and its measurements are the result ([research/research-gap.md](research/research-gap.md)). Everything in this repo (code, experiments, research notes, decisions) is on GitHub: `github.com/CubePillow/ttrpg-layered-scenes` (the trimmed hand-off copy of `layer-prototype`).
 
 ## 2. State of the draft
 

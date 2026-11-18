@@ -41,3 +41,14 @@ prototype/kaggle/upload_*/
 prototype/kaggle/results_*/
 prototype/kaggle/*.zip
 prototype/vendor/diffuser_layerdiffuse/
+
+# ---------- Experiments: keep docs, scripts, inputs and sheets; skip raw image folders ----------
+experiments/all_images/
+experiments/confirm_images/
+experiments/sheets_unfiltered/
+experiments/final/*/
+experiments/confirm/
+experiments/p1*/
+experiments/p2*/
+experiments/p3*/
+experiments/r2_*/
