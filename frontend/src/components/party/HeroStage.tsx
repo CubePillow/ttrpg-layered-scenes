@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { isMusicMuted, playTheme, setMusicMuted, stopTheme } from '../../audio/chiptune'
+import { playTheme } from '../../audio/chiptune'
 import { HERO_THEMES } from '../../audio/heroThemes'
 import { Button, ButtonGroup, Panel, SectionTitle, SwatchPicker, TextInput } from '../ui'
 import { cx } from '../ui/cx'
@@ -26,8 +26,6 @@ export default function HeroStage({ count, party, onPartyChange, onBack, onDone 
   const [nameKept, setNameKept] = useState(() => party.length >= count)
   const timer = useRef<number | undefined>(undefined)
 
-  const [muted, setMuted] = useState(isMusicMuted)
-
   useEffect(() => () => window.clearTimeout(timer.current), [])
 
   // Each class has its own music; it changes as soon as another hero is picked
@@ -35,17 +33,11 @@ export default function HeroStage({ count, party, onPartyChange, onBack, onDone 
     playTheme(HERO_THEMES[draft.classId])
   }, [draft.classId])
 
-  useEffect(() => stopTheme, [])
 
   const chosen = heroClass(draft)
   const others = party.filter((_, i) => i !== index)
   const nameOk = draft.name.trim().length > 0
   const takenNames = others.map((hero) => hero.name)
-
-  const toggleMusic = () => {
-    setMusicMuted(!muted)
-    setMuted(!muted)
-  }
 
   const update = (change: Partial<Hero>) => setDraft((hero) => ({ ...hero, ...change }))
 
@@ -87,12 +79,7 @@ export default function HeroStage({ count, party, onPartyChange, onBack, onDone 
             Player {index + 1} of {count}
           </p>
           <SectionTitle>Choose your hero</SectionTitle>
-          <div className={styles.music}>
-            <span className={styles.musicTitle}>{muted ? 'Music off' : `Now playing: ${HERO_THEMES[draft.classId].title}`}</span>
-            <Button aria-pressed={!muted} onClick={toggleMusic}>
-              {muted ? 'Music on' : 'Mute'}
-            </Button>
-          </div>
+          <p className={styles.musicTitle}>Theme: {HERO_THEMES[draft.classId].title}</p>
         </header>
 
         <div className={styles.forgeGrid}>

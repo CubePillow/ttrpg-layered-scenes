@@ -93,14 +93,8 @@
   margin-bottom: 22px;
 }
 
-.music {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-left: auto;
-}
-
 .musicTitle {
+  margin-left: auto;
   font-size: 15px;
   color: var(--text-dim);
 }
@@ -509,8 +503,7 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .music {
-    justify-content: space-between;
+  .musicTitle {
     width: 100%;
     margin-left: 0;
   }

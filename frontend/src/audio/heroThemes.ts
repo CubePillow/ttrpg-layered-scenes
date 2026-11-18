@@ -10,9 +10,28 @@ export type HeroTheme = {
   bass: OscillatorType
   /** How long a note rings, in sixteenth notes */
   ring: number
+  /** How long a bass note rings; 1.8 when left out */
+  bassRing?: number
+  /** Loudness from 0 to 1, and a slow fade-in when it is set; for quiet background music */
+  soft?: number
   melody: string
   bassline: string
   drums: string
+}
+
+/** The quiet music that plays through the game, except while a hero is being chosen. */
+export const AMBIENT_THEME: HeroTheme = {
+  title: 'Campfire Rest',
+  bpm: 58,
+  lead: 'sine',
+  bass: 'sine',
+  ring: 7,
+  bassRing: 8,
+  soft: 0.6,
+  melody:
+    'E4 . . . G4 . . . A4 . . . . . . . G4 . . . E4 . . . D4 . . . . . . . C4 . . . E4 . . . G4 . . . . . . . A4 . . . G4 . . . E4 . . . . . . .',
+  bassline: 'C3 . . . G2 . . . A2 . . . E2 . . . F2 . . . C3 . . . G2 . . . G2 . . .',
+  drums: '................',
 }
 
 export const HERO_THEMES: Record<string, HeroTheme> = {

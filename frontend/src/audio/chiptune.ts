@@ -4,6 +4,7 @@ import type { HeroTheme } from './heroThemes'
 const VOLUME = 0.5
 const FADE_SECONDS = 0.1
 const LOOK_AHEAD_SECONDS = 0.15
+const SOFT_FADE_IN_SECONDS = 2
 const MUTE_KEY = 'ttrpg-music-muted'
 
 const NOTE_INDEX: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }
@@ -58,7 +59,7 @@ export function scheduleStep(ctx: BaseAudioContext, out: AudioNode, theme: HeroT
 
   if (step % 2 === 0) {
     const bass = noteFrequency(bassline[(step / 2) % bassline.length])
-    if (bass) tone(ctx, out, theme.bass, bass, at, sixteenth * 1.8, theme.bass === 'sawtooth' || theme.bass === 'square' ? 0.2 : 0.42)
+    if (bass) tone(ctx, out, theme.bass, bass, at, sixteenth * (theme.bassRing ?? 1.8), theme.bass === 'sawtooth' || theme.bass === 'square' ? 0.2 : 0.42)
   }
 
   const drum = theme.drums[step % theme.drums.length]
@@ -119,6 +120,9 @@ export function playTheme(theme: HeroTheme) {
   if (playing) fadeOut(playing.bus, context)
 
   const bus = context.createGain()
+  const start = context.currentTime + wait
+  bus.gain.setValueAtTime(theme.soft === undefined ? 1 : 0, start)
+  if (theme.soft !== undefined) bus.gain.linearRampToValueAtTime(theme.soft, start + SOFT_FADE_IN_SECONDS)
   bus.connect(master)
   playing = { theme, bus, step: 0, next: context.currentTime + wait }
   timer ??= window.setInterval(tick, 30)
@@ -133,6 +137,13 @@ export function stopTheme() {
 }
 
 if (otherTabs) otherTabs.onmessage = () => stopTheme()
+
+// A page opened by a link may not make sound until the player clicks or presses a key on it
+for (const event of ['pointerdown', 'keydown']) {
+  window.addEventListener(event, () => {
+    if (playing && context?.state === 'suspended' && !document.hidden) void context.resume()
+  })
+}
 
 // No music from a tab nobody is looking at
 document.addEventListener('visibilitychange', () => {

@@ -19,6 +19,15 @@
   background: rgba(7, 6, 12, 0.45);
 }
 
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  width: min(100%, 1120px);
+}
+
 .content {
   position: relative;
   min-height: 100svh;
