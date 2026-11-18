@@ -131,6 +131,7 @@ def connect() -> None:
         if _worker and _worker.is_alive():
             return
         _cancel.clear()
+        _status.update(stage="account", progress=5)  # Anyone asking from now on sees that the connection has begun
         _worker = threading.Thread(target=_connect, daemon=True)
         _worker.start()
 
