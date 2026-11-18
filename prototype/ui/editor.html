@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Layer editor</title>
+<style>
+  :root { --bg:#1f2024; --panel:#2b2d33; --line:#3d4048; --text:#e8e9ec; --muted:#9aa0aa; --accent:#f97316; }
+  @media (prefers-color-scheme: light) { :root { --bg:#f4f4f6; --panel:#ffffff; --line:#d5d7dd; --text:#1d1f24; --muted:#5d6370; } }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font:13px system-ui, sans-serif; }
+  #app { display:grid; grid-template-columns: 44px minmax(0,1fr) 220px; gap:8px; padding:8px; height:100%; }
+  #tools { display:flex; flex-direction:column; gap:6px; }
+  .tool, .btn { background:var(--panel); border:1px solid var(--line); color:var(--text); border-radius:6px; cursor:pointer; padding:6px; font:inherit; }
+  .tool { width:44px; height:40px; font-size:18px; }
+  .tool.on { border-color:var(--accent); outline:2px solid var(--accent); }
+  .btn:hover, .tool:hover { border-color:var(--accent); }
+  #mid { display:flex; flex-direction:column; gap:6px; min-width:0; }
+  #bar { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  #stage { background:repeating-conic-gradient(#8884 0% 25%, #0000 0% 50%) 0 0 / 16px 16px; border:1px solid var(--line); border-radius:6px; line-height:0; align-self:flex-start; max-width:100%; }
+  canvas#view { width:100%; height:auto; max-width:760px; touch-action:none; cursor:default; }
+  #status { color:var(--muted); min-height:1.4em; }
+  #layers { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:6px; overflow:auto; max-height:100%; }
+  .row { display:flex; align-items:center; gap:4px; padding:3px 4px; border-radius:4px; cursor:pointer; }
+  .row.sel { background:#f9731633; outline:1px solid var(--accent); }
+  .row .nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row button { background:none; border:0; color:var(--muted); cursor:pointer; padding:0 3px; font-size:14px; }
+  .row button:hover { color:var(--accent); }
+  h4 { margin:2px 0 6px; font-size:12px; color:var(--muted); font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
+  label { display:flex; align-items:center; gap:4px; color:var(--muted); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="tools">
+    <button class="tool on" id="t-move" title="Move / transform (V): drag a layer, or drag inside a selection to move just that part; corner handles resize, the round handle rotates">✥</button>
+    <button class="tool" id="t-rect" title="Rectangle select (M)">▭</button>
+    <button class="tool" id="t-lasso" title="Free (lasso) select (L)">➰</button>
+  </div>
+  <div id="mid">
+    <div id="bar">
+      <button class="btn" id="b-cut" title="Move the selected part of the active layer into a new layer of its own">Cut to new layer</button>
+      <button class="btn" id="b-erase" title="Delete the selected part from the active layer, e.g. an object the splitter put on the wrong layer (Delete key)">Delete selected part</button>
+      <button class="btn" id="b-desel" title="Deselect (Esc)">Deselect</button>
+      <button class="btn" id="b-reset" title="Put the active layer back (position, size, rotation)">Reset layer</button>
+      <button class="btn" id="b-undo" title="Undo (Ctrl+Z)">Undo</button>
+      <button class="btn" id="b-export" title="Download the composite as PNG">Export PNG</button>
+      <label title="Like Photoshop's Move tool option: when on, clicking selects the layer under the pointer. When off (default) dragging moves the active layer; Ctrl/Cmd+click picks the layer under the pointer"><input type="checkbox" id="auto"> auto-select layer</label>
+    </div>
+    <div id="stage"><canvas id="view"></canvas></div>
+    <div id="status">Loading…</div>
+  </div>
+  <div id="layers"><h4>Layers (top first)</h4><div id="list"></div></div>
+</div>
+<script>
+"use strict";
+const q = new URLSearchParams(location.search);
+const SCENE = q.get("scene") || "";
+const view = document.getElementById("view"), ctx = view.getContext("2d");
+const $ = id => document.getElementById(id);
+let W = 512, H = 512, layers = [], active = null, tool = "move", sel = null, drag = null, history = [], saveTimer = null, newCount = 0, busy = false, fl = null, polling = false;
+const HANDLE = 9;
+
+// ------------------------------------------------------------------ helpers
+function say(t) { $("status").textContent = t; }
+function mk(w, h) { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
+function loadImg(url) { return new Promise((ok, no) => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => ok(i); i.onerror = no; i.src = url; }); }
+function bbox(canvas) {                       // bounding box of the pixels with alpha > 24 (the same rule as engine._placed), so faint strays do not stretch the handles
+  const d = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
+  let x0 = canvas.width, y0 = canvas.height, x1 = -1, y1 = -1;
+  for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) if (d[(y * canvas.width + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  return x1 < 0 ? [0, 0, canvas.width, canvas.height] : [x0, y0, x1 + 1, y1 + 1];
+}
+function setCanvas(L, c) { L.canvas = c; const b = bbox(c); L.bb = b; L.cx = (b[0] + b[2]) / 2; L.cy = (b[1] + b[3]) / 2; }
+function snapshot() { history.push(layers.map(L => Object.assign({}, L))); if (history.length > 30) history.shift(); }
+function undo() { if (!history.length) return say("Nothing to undo."); const h = history.pop(); const keep = active && active.id; layers = h; active = layers.find(l => l.id === keep) || layers[layers.length - 1] || null; sel = null; changed(false); say("Undone."); }
+
+// layer -> document transform: translate(d) * translate(c) * scale(s) * rotate(-rot) * translate(-c)
+function applyT(c, L) { c.translate(L.dx * W, L.dy * H); c.translate(L.cx, L.cy); c.scale(L.scale, L.scale); c.rotate(-L.rot * Math.PI / 180); c.translate(-L.cx, -L.cy); }
+function toDoc(L, x, y) {                     // a point in layer pixels -> document pixels
+  const px = x - L.cx, py = y - L.cy, r = -L.rot * Math.PI / 180, cs = Math.cos(r), sn = Math.sin(r);
+  return [L.cx + L.dx * W + L.scale * (px * cs - py * sn), L.cy + L.dy * H + L.scale * (px * sn + py * cs)];
+}
+function corners(L) { const b = L.bb; return [toDoc(L, b[0], b[1]), toDoc(L, b[2], b[1]), toDoc(L, b[2], b[3]), toDoc(L, b[0], b[3])]; }
+function center(L) { return [L.cx + L.dx * W, L.cy + L.dy * H]; }
+function rotHandle(L) { const c = center(L), t = toDoc(L, L.cx, L.bb[1]), vx = t[0] - c[0], vy = t[1] - c[1], n = Math.hypot(vx, vy) || 1; return [t[0] + vx / n * 26, t[1] + vy / n * 26]; }
+function opaqueAt(L, x, y) {                  // is the layer visible at document point (x, y)?
+  if (!L.visible) return false;
+  const c = mk(1, 1), g = c.getContext("2d"); g.translate(-x, -y); applyT(g, L); g.drawImage(L.canvas, 0, 0);
+  return g.getImageData(0, 0, 1, 1).data[3] > 24;
+}
+
+// ------------------------------------------------------------------ drawing
+function render() {
+  ctx.clearRect(0, 0, W, H);
+  for (const L of layers) { if (!L.visible) continue; ctx.save(); applyT(ctx, L); ctx.drawImage(L.canvas, 0, 0); if (fl && L === active) ctx.drawImage(fl.c, fl.ox, fl.oy); ctx.restore(); }
+  if (sel) { ctx.save(); ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]); ctx.strokeStyle = "#fff"; ctx.stroke(selPath()); ctx.lineDashOffset = 5; ctx.strokeStyle = "#000"; ctx.stroke(selPath()); ctx.restore(); }
+  if (active && active.visible && tool === "move" && !(drag && drag.kind === "select")) {
+    const k = corners(active); ctx.save(); ctx.strokeStyle = "#f97316"; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); k.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = "#fff"; k.forEach(p => { ctx.fillRect(p[0] - HANDLE / 2, p[1] - HANDLE / 2, HANDLE, HANDLE); ctx.strokeRect(p[0] - HANDLE / 2, p[1] - HANDLE / 2, HANDLE, HANDLE); });
+    const t = toDoc(active, active.cx, active.bb[1]), r = rotHandle(active); ctx.beginPath(); ctx.moveTo(t[0], t[1]); ctx.lineTo(r[0], r[1]); ctx.stroke();
+    ctx.beginPath(); ctx.arc(r[0], r[1], HANDLE / 2 + 1, 0, 7); ctx.fill(); ctx.stroke(); ctx.restore();
+  }
+}
+function selPath() {
+  const p = new Path2D();
+  if (sel.type === "rect") p.rect(sel.x, sel.y, sel.w, sel.h);
+  else { sel.pts.forEach((q, i) => i ? p.lineTo(q[0], q[1]) : p.moveTo(q[0], q[1])); p.closePath(); }
+  return p;
+}
+function renderList() {
+  const box = $("list"); box.innerHTML = "";
+  [...layers].reverse().forEach(L => {
+    const r = document.createElement("div"); r.className = "row" + (L === active ? " sel" : "");
+    const eye = document.createElement("button"); eye.textContent = L.visible ? "👁" : "–"; eye.title = "show / hide";
+    eye.onclick = e => { e.stopPropagation(); snapshot(); L.visible = !L.visible; changed(); };
+    const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = L.name + (L.role === "background" ? " (background)" : "");
+    const up = document.createElement("button"); up.textContent = "▲"; up.title = "move up";
+    up.onclick = e => { e.stopPropagation(); reorder(L, 1); };
+    const dn = document.createElement("button"); dn.textContent = "▼"; dn.title = "move down";
+    dn.onclick = e => { e.stopPropagation(); reorder(L, -1); };
+    r.append(eye, nm, up, dn);
+    if (L.role !== "background") { const x = document.createElement("button"); x.textContent = "✕"; x.title = "delete layer"; x.onclick = e => { e.stopPropagation(); removeLayer(L); }; r.append(x); }
+    r.onclick = () => { active = L; sel = null; changed(false); postSelected(); };
+    box.append(r);
+  });
+}
+function changed(save = true) { render(); renderList(); if (save) scheduleSave(); }
+
+// ------------------------------------------------------------------ layer operations
+function reorder(L, dir) { const i = layers.indexOf(L), j = i + dir; if (j < 1 || j >= layers.length) return; snapshot(); [layers[i], layers[j]] = [layers[j], layers[i]]; changed(); }
+function removeLayer(L) { if (!confirm("Delete the layer '" + L.name + "' from the scene?")) return; snapshot(); layers = layers.filter(l => l !== L); active = layers[layers.length - 1] || null; changed(); postSelected(); }
+function bake(L) {                            // draw the layer with its transform into its own pixels (needed before editing pixels)
+  const c = mk(W, H), g = c.getContext("2d"); g.save(); applyT(g, L); g.drawImage(L.canvas, 0, 0); g.restore();
+  setCanvas(L, c); L.dx = L.dy = 0; L.scale = 1; L.rot = 0; L.dirty = true;
+}
+function maskCanvas() { const c = mk(W, H), g = c.getContext("2d"); g.fillStyle = "#fff"; g.fill(selPath()); return c; }
+function cutSelection(erase) {
+  if (!active || !sel) return say("Select an area first (rectangle or lasso tool).");
+  snapshot(); bake(active);
+  const m = maskCanvas(), part = mk(W, H), pg = part.getContext("2d");
+  pg.drawImage(active.canvas, 0, 0); pg.globalCompositeOperation = "destination-in"; pg.drawImage(m, 0, 0);
+  if (bbox(part)[2] - bbox(part)[0] <= 0 || !part.getContext("2d").getImageData(0, 0, W, H).data.some((v, i) => i % 4 === 3 && v > 0)) { history.pop(); return say("The selection holds no pixels of this layer."); }
+  const rest = mk(W, H), rg = rest.getContext("2d"); rg.drawImage(active.canvas, 0, 0); rg.globalCompositeOperation = "destination-out"; rg.drawImage(m, 0, 0);
+  setCanvas(active, rest);
+  if (!erase) {
+    const L = { id: "new-" + (++newCount), name: "Selection " + newCount, role: "object", visible: true, dx: 0, dy: 0, scale: 1, rot: 0, dirty: true, isNew: true };
+    setCanvas(L, part); layers.splice(layers.indexOf(active) + 1, 0, L); active = L; say("Cut to the new layer '" + L.name + "'. Drag it, resize with the corners, rotate with the round handle.");
+  } else say("Deleted the selected part from '" + active.name + "'.");
+  sel = null; changed(); postSelected();
+}
+
+function beginFloat() {                       // lift the selected part of the active layer so it can be dragged within the same layer
+  snapshot(); bake(active);
+  const m = maskCanvas(), part = mk(W, H), pg = part.getContext("2d");
+  pg.drawImage(active.canvas, 0, 0); pg.globalCompositeOperation = "destination-in"; pg.drawImage(m, 0, 0);
+  if (!pg.getImageData(0, 0, W, H).data.some((v, i) => i % 4 === 3 && v > 0)) { history.pop(); say("The selection holds no pixels of the active layer '" + active.name + "' (pick the layer that holds the part, then select)."); return false; }
+  const rest = mk(W, H), rg = rest.getContext("2d"); rg.drawImage(active.canvas, 0, 0); rg.globalCompositeOperation = "destination-out"; rg.drawImage(m, 0, 0);
+  setCanvas(active, rest); fl = { c: part, ox: 0, oy: 0 }; return true;
+}
+function dropFloat() {                        // put the lifted part down in the same layer, and move the selection with it
+  const g = active.canvas.getContext("2d"); g.drawImage(fl.c, fl.ox, fl.oy); setCanvas(active, active.canvas); active.dirty = true;
+  if (sel.type === "rect") { sel.x += fl.ox; sel.y += fl.oy; } else sel.pts = sel.pts.map(q => [q[0] + fl.ox, q[1] + fl.oy]);
+  fl = null;
+}
+
+// ------------------------------------------------------------------ pointer interaction
+function pos(e) { const r = view.getBoundingClientRect(); return [(e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height]; }
+function hitHandle(p) {
+  if (!active || tool !== "move") return null;
+  const k = corners(active), r = rotHandle(active), t = HANDLE + 4;
+  if (Math.hypot(p[0] - r[0], p[1] - r[1]) < t) return "rot";
+  for (let i = 0; i < 4; i++) if (Math.abs(p[0] - k[i][0]) < t && Math.abs(p[1] - k[i][1]) < t) return "scale";
+  return null;
+}
+function inSel(p) { if (!sel) return false; const g = ctx; return g.isPointInPath(selPath(), p[0], p[1]); }
+view.addEventListener("pointerdown", e => {
+  view.setPointerCapture(e.pointerId); const p = pos(e);
+  if (tool === "rect") { sel = { type: "rect", x: p[0], y: p[1], w: 0, h: 0 }; drag = { kind: "select", p0: p }; return render(); }
+  if (tool === "lasso") { sel = { type: "lasso", pts: [p] }; drag = { kind: "select" }; return render(); }
+  const h = hitHandle(p);
+  if (h && active) {
+    snapshot(); const c = center(active);
+    if (h === "rot") drag = { kind: "rot", a0: Math.atan2(p[1] - c[1], p[0] - c[0]), rot0: active.rot };
+    else { const b = active.bb; drag = { kind: "scale", r0: Math.hypot(b[2] - b[0], b[3] - b[1]) / 2, c }; }
+    return;
+  }
+  if (sel && active && inSel(p)) { if (beginFloat()) drag = { kind: "float", p0: p }; return; }
+  if ($("auto").checked || e.ctrlKey || e.metaKey) { for (let i = layers.length - 1; i >= 0; i--) if (opaqueAt(layers[i], p[0], p[1])) { if (active !== layers[i]) { active = layers[i]; postSelected(); } break; } }
+  sel = null;
+  if (active) { snapshot(); drag = { kind: "move", p0: p, dx0: active.dx, dy0: active.dy }; }
+  changed(false);
+});
+view.addEventListener("pointermove", e => {
+  const p = pos(e);
+  if (!drag) { const h = hitHandle(p); view.style.cursor = h === "rot" ? "grab" : h ? "nwse-resize" : tool === "move" ? "move" : "crosshair"; return; }
+  if (drag.kind === "select") { if (sel.type === "rect") { sel.w = p[0] - drag.p0[0]; sel.h = p[1] - drag.p0[1]; } else sel.pts.push(p); }
+  else if (drag.kind === "float") { fl.ox = p[0] - drag.p0[0]; fl.oy = p[1] - drag.p0[1]; }
+  else if (drag.kind === "move") { active.dx = drag.dx0 + (p[0] - drag.p0[0]) / W; active.dy = drag.dy0 + (p[1] - drag.p0[1]) / H; }
+  else if (drag.kind === "scale") { active.scale = Math.max(0.05, Math.hypot(p[0] - drag.c[0], p[1] - drag.c[1]) / drag.r0); }
+  else if (drag.kind === "rot") { const c = center(active); active.rot = drag.rot0 - (Math.atan2(p[1] - c[1], p[0] - c[0]) - drag.a0) * 180 / Math.PI; }
+  render();
+});
+view.addEventListener("pointerup", () => {
+  if (!drag) return; const k = drag.kind; drag = null;
+  if (k === "float") { dropFloat(); say("Moved the part inside the layer '" + active.name + "'."); return changed(); }
+  if (k === "select") {
+    if (sel.type === "rect") { if (sel.w < 0) { sel.x += sel.w; sel.w = -sel.w; } if (sel.h < 0) { sel.y += sel.h; sel.h = -sel.h; } if (sel.w < 3 || sel.h < 3) sel = null; }
+    else if (sel.pts.length < 3) sel = null;
+    if (sel) say("Selection on layer '" + (active ? active.name : "-") + "'. Switch to the move tool and drag inside it to move that part within the layer; 'Delete selected part' removes it from the layer; 'Cut to new layer' makes a layer of it.");
+    return render();
+  }
+  changed();
+});
+
+// ------------------------------------------------------------------ tools and buttons
+function setTool(t) { tool = t; for (const n of ["move", "rect", "lasso"]) $("t-" + n).classList.toggle("on", n === t); view.style.cursor = t === "move" ? "move" : "crosshair"; render(); }
+$("t-move").onclick = () => setTool("move"); $("t-rect").onclick = () => setTool("rect"); $("t-lasso").onclick = () => setTool("lasso");
+$("b-cut").onclick = () => cutSelection(false); $("b-erase").onclick = () => cutSelection(true);
+$("b-desel").onclick = () => { sel = null; render(); };
+$("b-reset").onclick = () => { if (!active) return; snapshot(); active.dx = active.dy = 0; active.scale = 1; active.rot = 0; changed(); };
+$("b-undo").onclick = undo;
+$("b-export").onclick = () => { const a = document.createElement("a"); a.download = (SCENE || "scene") + ".png"; a.href = view.toDataURL("image/png"); a.click(); };
+addEventListener("keydown", e => {
+  if (e.target && /input|textarea/i.test(e.target.tagName)) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); }
+  else if (e.key === "Escape") { sel = null; render(); }
+  else if (e.key === "Delete" || e.key === "Backspace") { if (sel) cutSelection(true); }
+  else if (e.key.toLowerCase() === "v") setTool("move"); else if (e.key.toLowerCase() === "m") setTool("rect"); else if (e.key.toLowerCase() === "l") setTool("lasso");
+});
+
+// ------------------------------------------------------------------ server: load, autosave, reload
+async function loadScene(keepLocal) {
+  if (!SCENE) return say("No scene yet: make a picture and split it, or load a saved scene.");
+  const d = await (await fetch("/api/scene/" + encodeURIComponent(SCENE))).json();
+  W = d.W; H = d.H; view.width = W; view.height = H;
+  const old = new Map(layers.map(l => [l.id, l])), out = [];
+  for (const s of d.layers) {
+    let L = old.get(s.id);
+    if (!L || L.url !== s.url) { const img = await loadImg(s.url); const c = mk(W, H); c.getContext("2d").drawImage(img, 0, 0, W, H); L = Object.assign(L || {}, { id: s.id }); setCanvas(L, c); L.url = s.url; L.dirty = false; }
+    Object.assign(L, { name: s.name, role: s.role, visible: s.visible, dx: s.dx, dy: s.dy, scale: s.scale, rot: s.rot });
+    out.push(L);
+  }
+  layers = out; history = []; sel = null;
+  active = layers.find(l => l.id === (active && active.id)) || layers.find(l => l.id === d.selected) || layers.filter(l => l.role !== "background").pop() || layers[0] || null;
+  changed(false); postSelected();
+  say(layers.length ? "Pick a layer, then drag it. Rectangle / lasso select an area to move just that part." : "No layers yet.");
+  if (d.generating) poll();
+}
+function stateBody() {
+  return { selected: active ? active.id : null, layers: layers.map(L => ({ id: L.id, name: L.name, role: L.role, visible: L.visible, dx: L.dx, dy: L.dy, scale: L.scale, rot: L.rot, png: L.dirty ? L.canvas.toDataURL("image/png") : null })) };
+}
+function scheduleSave() { clearTimeout(saveTimer); saveTimer = setTimeout(save, 700); }
+async function save() {
+  if (!SCENE || busy) { if (busy) scheduleSave(); return; } busy = true; clearTimeout(saveTimer);
+  try {
+    const body = stateBody();
+    const r = await fetch("/api/scene/" + encodeURIComponent(SCENE) + "/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const d = await r.json();
+    layers.forEach((L, i) => { const s = d.layers[i]; if (s) { L.id = s.id; L.url = s.url; } L.dirty = false; L.isNew = false; });
+    if (active) postSelected(); renderList();
+  } catch (e) { say("Saving failed: " + e); }
+  busy = false;
+}
+function postSelected() { if (SCENE && active && !String(active.id).startsWith("new-")) fetch("/api/scene/" + encodeURIComponent(SCENE) + "/selected", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: active.id }) }).catch(() => {}); }
+addEventListener("message", async e => {
+  if (!e.data) return;
+  if (e.data.type === "flush") { while (busy) await new Promise(r => setTimeout(r, 100)); await save(); parent.postMessage({ type: "flushed" }, "*"); }
+  else if (e.data.type === "reload") await loadScene(true);        // the page flushed before the server changed something
+});
+async function poll() {                       // while the split is still running, add each new layer as it arrives
+  if (polling || !SCENE) return; polling = true;
+  try {
+    for (;;) {
+      const d = await (await fetch("/api/scene/" + encodeURIComponent(SCENE))).json();
+      let added = 0;
+      for (const s of d.layers) {
+        if (layers.some(l => l.id === s.id)) continue;
+        const img = await loadImg(s.url); const c = mk(W, H); c.getContext("2d").drawImage(img, 0, 0, W, H);
+        const L = { id: s.id, url: s.url, dirty: false, name: s.name, role: s.role, visible: s.visible, dx: s.dx, dy: s.dy, scale: s.scale, rot: s.rot };
+        setCanvas(L, c); if (s.role === "background") layers.unshift(L); else layers.push(L);
+        if (!active || active.role === "background") active = L; added++;
+      }
+      if (added) { changed(false); postSelected(); }
+      if (!d.generating) { if (added || layers.length) say("All layers are in. Pick a layer, then drag it. Rectangle / lasso select an area to move just that part."); break; }
+      say("Making layers: " + d.generating + (layers.length ? ". You can already work on the layers that are here." : ""));
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  } catch (e) { say("Layer updates stopped: " + e); }
+  polling = false;
+}
+addEventListener("beforeunload", () => { if (saveTimer) navigator.sendBeacon && SCENE && navigator.sendBeacon("/api/scene/" + encodeURIComponent(SCENE) + "/save", new Blob([JSON.stringify(stateBody())], { type: "application/json" })); });
+loadScene().catch(e => say("Could not load the scene: " + e));
+</script>
+</body>
+</html>
