@@ -1,0 +1,39 @@
+.eyebrow {
+  font-family: var(--pixel);
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.pageTitle {
+  font-family: var(--pixel);
+  font-size: clamp(18px, 2.6vw, 30px);
+  line-height: 1.6;
+  font-weight: 400;
+  color: var(--heading);
+  text-shadow: 3px 3px 0 var(--ink);
+}
+
+.sectionTitle {
+  font-family: var(--pixel);
+  font-size: clamp(16px, 2vw, 22px);
+  font-weight: 400;
+  color: var(--heading);
+}
+
+.lede {
+  font-size: 19px;
+  color: var(--text);
+  max-width: 46ch;
+}
+
+.accent {
+  color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .lede {
+    font-size: 17px;
+  }
+}

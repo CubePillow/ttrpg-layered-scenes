@@ -1,0 +1,6 @@
+.footer {
+  padding: 24px clamp(16px, 5vw, 72px) 40px;
+  font-size: 15px;
+  color: var(--text-dim);
+  text-align: center;
+}
