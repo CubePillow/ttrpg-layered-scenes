@@ -86,6 +86,12 @@ def _wait_until_ready(launcher) -> bool:
     return False
 
 
+def _models_ready(launcher) -> bool:
+    """100% means both models answer: SDXL-Turbo makes pictures, Qwen-Image-2.1 splits and edits them."""
+    checks = [launcher.connection.check(role=role) for role in ("generate", "split")]
+    return all(check["ok"] and check["info"].get("role") == "both" for check in checks)
+
+
 def _watch_session(launcher) -> None:
     while not _cancel.wait(WATCH_SECONDS):
         if launcher.poll(ROLE) != "ready":
@@ -107,7 +113,11 @@ def _connect() -> None:
             _update("notebook", launcher.start(ROLE, IDLE_MINUTES), 20)
             if not _wait_until_ready(launcher):
                 return
-        _update("ready", "Connected. The Kaggle GPU session is ready.", 100)
+        _update("session", "Checking SDXL-Turbo and Qwen-Image-2.1...", 97)
+        if not _models_ready(launcher):
+            _update("failed", "The Kaggle session answers, but the two models are not ready.")
+            return
+        _update("ready", "Connected. SDXL-Turbo and Qwen-Image-2.1 are ready to use.", 100)
         _watch_session(launcher)
     except Exception as error:  # A failed connection must never stop the backend
         logger.exception("[kaggle] Connection failed")

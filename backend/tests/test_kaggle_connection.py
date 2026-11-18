@@ -1,4 +1,5 @@
 import time
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -17,6 +18,8 @@ class FakeLauncher:
         self.result = available
         self.started = 0
         self.stopped = 0
+        self.server_role = "both"
+        self.connection = SimpleNamespace(check=lambda role: {"ok": True, "info": {"role": self.server_role}})
 
     def available(self):
         return self.result
@@ -63,6 +66,13 @@ def test_starts_a_session_and_reports_each_step(monkeypatch):
     text = " ".join(status["log"])
     for step in ("Checking the Kaggle account", "Signed in as tester", "Sending the notebook", "Kaggle status running", "Connected"):
         assert step in text
+
+
+def test_full_progress_needs_both_models(monkeypatch):
+    launcher = FakeLauncher(polls=("ready", "off"))
+    launcher.server_role = "generate"
+    status = run(monkeypatch, launcher)
+    assert status["stage"] == "failed" and "two models" in status["message"] and status["progress"] < 100
 
 
 def test_joins_a_running_session_without_starting_another(monkeypatch):
