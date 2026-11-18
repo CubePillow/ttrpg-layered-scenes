@@ -93,6 +93,18 @@
   margin-bottom: 22px;
 }
 
+.music {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
+}
+
+.musicTitle {
+  font-size: 15px;
+  color: var(--text-dim);
+}
+
 .playerTag {
   font-family: var(--pixel);
   font-size: 11px;
@@ -495,6 +507,12 @@
 
   .roster {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .music {
+    justify-content: space-between;
+    width: 100%;
+    margin-left: 0;
   }
 
   .parade canvas:nth-child(n + 4) {
