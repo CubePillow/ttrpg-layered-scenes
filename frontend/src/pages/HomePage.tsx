@@ -3,7 +3,6 @@ import LayerPicker from '../components/layers/LayerPicker'
 import PixelScene from '../components/pixel-scene/PixelScene'
 import {
   Accent,
-  Badge,
   Button,
   ButtonGroup,
   Eyebrow,
@@ -33,12 +32,10 @@ export default function HomePage() {
           you can move, swap and redraw as the story unfolds.
         </Lede>
         <ButtonGroup className={styles.actions}>
-          <Button variant="primary" href="#how">
-            How it works
+          <Button variant="primary" href="/party">
+            Start a scene
           </Button>
-          <Button disabled>
-            Start a scene <Badge>soon</Badge>
-          </Button>
+          <Button href="#how">How it works</Button>
         </ButtonGroup>
 
         <LayerPicker
