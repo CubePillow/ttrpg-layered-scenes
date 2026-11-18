@@ -31,6 +31,9 @@ generated/
 .DS_Store
 Thumbs.db
 
+# ---------- Saved games ----------
+backend/data/
+
 # ---------- Prototype (Python) ----------
 __pycache__/
 *.pyc

@@ -14,7 +14,7 @@ type Props = {
   party: Hero[]
   onPartyChange: (party: Hero[]) => void
   onBack: () => void
-  onDone: () => void
+  onDone: (heroes: Hero[]) => void
 }
 
 /** Players take turns: each one picks a hero and locks it in, then the next player is up. */
@@ -61,7 +61,7 @@ export default function HeroStage({ count, party, onPartyChange, onBack, onDone 
     const finish = () => {
       setLocking(false)
       if (index + 1 < count) goTo(index + 1, heroes)
-      else onDone()
+      else onDone(heroes)
     }
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       finish()

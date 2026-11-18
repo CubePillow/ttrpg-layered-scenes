@@ -324,9 +324,15 @@
   color: var(--text-dim);
 }
 
+.saveNote {
+  margin-top: 26px;
+  font-size: 16px;
+  color: var(--text-dim);
+}
+
 .readyActions {
   justify-content: center;
-  margin-top: 32px;
+  margin-top: 16px;
 }
 
 /* ---------- Choose a mode */
