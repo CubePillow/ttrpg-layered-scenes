@@ -23,11 +23,19 @@
 }
 
 .button:hover:not(:disabled) {
+  filter: brightness(1.2);
   transform: translateY(-2px);
 }
 
 .button:active:not(:disabled) {
-  transform: translateY(2px);
+  filter: brightness(0.9);
+  transform: translateY(3px);
+  box-shadow:
+    0 -4px 0 0 var(--ink),
+    0 4px 0 0 var(--ink),
+    -4px 0 0 0 var(--ink),
+    4px 0 0 0 var(--ink),
+    inset 4px 4px 0 0 rgba(0, 0, 0, 0.35);
 }
 
 .primary {

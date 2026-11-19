@@ -11,8 +11,8 @@ type ActionProps = ButtonHTMLAttributes<HTMLButtonElement> & { href?: undefined;
 export default function Button(props: LinkProps | ActionProps) {
   if (props.href !== undefined) {
     const { variant = 'default', className, ...rest } = props
-    return <a className={cx(styles.button, variant === 'primary' && styles.primary, className)} {...rest} />
+    return <a data-variant={variant} className={cx(styles.button, variant === 'primary' && styles.primary, className)} {...rest} />
   }
   const { variant = 'default', className, type = 'button', ...rest } = props
-  return <button type={type} className={cx(styles.button, variant === 'primary' && styles.primary, className)} {...rest} />
+  return <button type={type} data-variant={variant} className={cx(styles.button, variant === 'primary' && styles.primary, className)} {...rest} />
 }

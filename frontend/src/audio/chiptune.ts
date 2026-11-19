@@ -104,10 +104,11 @@ function tick() {
 /** Only one tab or window plays at a time: starting music here silences the others. */
 const otherTabs = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('ttrpg-music')
 
-/** Fades out the current theme, then starts this one, so two themes never sound together.
- * Browsers only allow sound after the player has clicked something. */
-export function playTheme(theme: HeroTheme) {
-  if (playing?.theme === theme) return
+function startAudio() {
+  if (context?.state === 'closed') {
+    context = null
+    master = null
+  }
   context ??= new AudioContext()
   if (!master) {
     master = context.createGain()
@@ -115,16 +116,24 @@ export function playTheme(theme: HeroTheme) {
     master.connect(context.destination)
   }
   void context.resume()
+  return { ctx: context, out: master }
+}
+
+/** Fades out the current theme, then starts this one, so two themes never sound together.
+ * Browsers only allow sound after the player has clicked something. */
+export function playTheme(theme: HeroTheme) {
+  if (playing?.theme === theme) return
+  const { ctx } = startAudio()
   otherTabs?.postMessage('playing')
   const wait = playing ? FADE_SECONDS + 0.02 : 0.05
-  if (playing) fadeOut(playing.bus, context)
+  if (playing) fadeOut(playing.bus, ctx)
 
-  const bus = context.createGain()
-  const start = context.currentTime + wait
+  const bus = ctx.createGain()
+  const start = ctx.currentTime + wait
   bus.gain.setValueAtTime(theme.soft === undefined ? 1 : 0, start)
   if (theme.soft !== undefined) bus.gain.linearRampToValueAtTime(theme.soft, start + SOFT_FADE_IN_SECONDS)
-  bus.connect(master)
-  playing = { theme, bus, step: 0, next: context.currentTime + wait }
+  bus.connect(master!)
+  playing = { theme, bus, step: 0, next: ctx.currentTime + wait }
   timer ??= window.setInterval(tick, 30)
   tick()
 }
@@ -157,6 +166,45 @@ import.meta.hot?.dispose(() => {
   otherTabs?.close()
   void context?.close()
 })
+
+export type UiSound = 'hover' | 'tick' | 'select' | 'confirm' | 'back' | 'lock'
+
+/** Notes of each interface sound: wave, note, start time in seconds, length and loudness. */
+const UI_SOUNDS: Record<UiSound, [OscillatorType, string, number, number, number][]> = {
+  hover: [['square', 'A5', 0, 0.035, 0.035]],
+  tick: [['triangle', 'E5', 0, 0.07, 0.22]],
+  select: [
+    ['square', 'E5', 0, 0.06, 0.1],
+    ['square', 'A5', 0.05, 0.09, 0.1],
+  ],
+  confirm: [
+    ['square', 'C5', 0, 0.07, 0.1],
+    ['square', 'E5', 0.06, 0.07, 0.1],
+    ['square', 'G5', 0.12, 0.13, 0.11],
+  ],
+  back: [
+    ['triangle', 'G4', 0, 0.08, 0.25],
+    ['triangle', 'D4', 0.07, 0.13, 0.25],
+  ],
+  lock: [
+    ['square', 'C5', 0, 0.07, 0.1],
+    ['square', 'E5', 0.06, 0.07, 0.1],
+    ['square', 'G5', 0.12, 0.07, 0.1],
+    ['square', 'C6', 0.18, 0.24, 0.12],
+  ],
+}
+
+/** Browsers block sound until the first click, so hovering stays silent until then. */
+export const canPlayUiSound = () => context?.state === 'running'
+
+export function playUiSound(sound: UiSound) {
+  const { ctx, out } = startAudio()
+  const now = ctx.currentTime + 0.005
+  for (const [wave, note, at, length, level] of UI_SOUNDS[sound]) {
+    tone(ctx, out, wave, noteFrequency(note)!, now + at, length, level)
+  }
+  if (sound === 'lock') noise(ctx, out, now + 0.18, 0.12, 0.12, 3000)
+}
 
 export const isMusicMuted = () => muted
 
