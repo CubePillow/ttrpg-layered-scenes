@@ -435,6 +435,52 @@
   transform: translateY(-3px);
 }
 
+/* ---------- Choose a style */
+.style {
+  width: min(100%, 1040px);
+  padding: 32px;
+  text-align: center;
+}
+
+.styleGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.styleOn {
+  box-shadow: inset 0 0 0 3px var(--accent);
+}
+
+.styleCard {
+  padding: 12px 12px 18px;
+}
+
+.stylePreview {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  object-position: 50% 85%; /* keep the campfire near the bottom in view */
+  box-shadow: 0 0 0 3px var(--ink);
+}
+
+.stylePixel {
+  image-rendering: pixelated;
+}
+
+.styleCard:disabled img {
+  opacity: 1;
+}
+
+.readyStyle {
+  margin-top: 10px;
+  font-size: 18px;
+  color: var(--text-dim);
+}
+
 /* ---------- Locking in a hero */
 @keyframes stamp {
   0% {
@@ -489,6 +535,7 @@
 .forge,
 .ready,
 .mode,
+.style,
 .count {
   animation: stageIn 200ms steps(4);
 }
@@ -505,6 +552,10 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .styleGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .preview {
     order: -1;
   }
@@ -519,11 +570,13 @@
   .forge,
   .ready,
   .mode,
+  .style,
   .count {
     padding: 18px;
   }
 
-  .modeGrid {
+  .modeGrid,
+  .styleGrid {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -540,6 +593,9 @@
     margin-left: 0;
   }
 
+}
+
+@media (max-width: 420px) {
   .parade canvas:nth-child(n + 4) {
     display: none;
   }
@@ -550,6 +606,7 @@
   .forge,
   .ready,
   .mode,
+  .style,
   .count,
   .idle,
   .hop,

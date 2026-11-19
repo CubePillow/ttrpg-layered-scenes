@@ -7,19 +7,24 @@ import CountStage from '../components/party/CountStage'
 import HeroStage from '../components/party/HeroStage'
 import ModeStage from '../components/party/ModeStage'
 import ReadyStage, { type SaveState } from '../components/party/ReadyStage'
+import StyleStage from '../components/party/StyleStage'
 import PixelScene from '../components/pixel-scene/PixelScene'
 import { Button, StepTrail } from '../components/ui'
+import { DEFAULT_ART_STYLE, type ArtStyleId } from '../data/artStyles'
 import type { Hero } from '../data/heroes'
 import styles from './PartySetupPage.module.css'
 
-const STEPS = ['Mode', 'Title', 'Players', 'Heroes', 'Set off']
+const STEPS = ['Mode', 'Title', 'Players', 'Heroes', 'Style', 'Set off']
 const HERO_STEP = 3
+const STYLE_STEP = 4
+const READY_STEP = 5
 
 export default function PartySetupPage() {
   const [step, setStep] = useState(0)
   const [title, setTitle] = useState('')
   const [count, setCount] = useState(1)
   const [party, setParty] = useState<Hero[]>([])
+  const [style, setStyle] = useState<ArtStyleId>(DEFAULT_ART_STYLE)
   const [muted, setMuted] = useState(isMusicMuted)
   const [saveState, setSaveState] = useState<SaveState>('saving')
   const gameId = useRef<string | null>(null)
@@ -38,11 +43,11 @@ export default function PartySetupPage() {
   }
 
   /** Saves run one after another, so this game is only ever created once. */
-  const save = (heroes: Hero[]) => {
+  const save = (chosenStyle: ArtStyleId) => {
     setSaveState('saving')
     saves.current = saves.current.then(async () => {
       try {
-        gameId.current = await saveGame(gameId.current, title.trim(), heroes)
+        gameId.current = await saveGame(gameId.current, title.trim(), chosenStyle, party)
         setSaveState('saved')
       } catch {
         setSaveState('failed')
@@ -52,8 +57,13 @@ export default function PartySetupPage() {
 
   const finishParty = (heroes: Hero[]) => {
     setParty(heroes)
-    setStep(4)
-    save(heroes)
+    setStep(STYLE_STEP)
+  }
+
+  const chooseStyle = (chosenStyle: ArtStyleId) => {
+    setStyle(chosenStyle)
+    setStep(READY_STEP)
+    save(chosenStyle)
   }
 
   const chooseCount = (players: number) => {
@@ -81,13 +91,18 @@ export default function PartySetupPage() {
         {step === HERO_STEP && (
           <HeroStage count={count} party={party} onPartyChange={setParty} onBack={() => setStep(2)} onDone={finishParty} />
         )}
-        {step === 4 && (
+        {step === STYLE_STEP && (
+          <StyleStage selected={style} onChoose={chooseStyle} onBack={() => setStep(HERO_STEP)} />
+        )}
+        {step === READY_STEP && (
           <ReadyStage
             title={title.trim()}
+            style={style}
             party={party}
             saveState={saveState}
-            onRetrySave={() => save(party)}
-            onBack={() => setStep(HERO_STEP)}
+            onRetrySave={() => save(style)}
+            onChangeParty={() => setStep(HERO_STEP)}
+            onChangeStyle={() => setStep(STYLE_STEP)}
           />
         )}
       </main>

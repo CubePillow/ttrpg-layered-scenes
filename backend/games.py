@@ -1,11 +1,11 @@
-"""Saved games: the title of each game and the hero, name and colour every player chose.
+"""Saved games: the title and picture style of each game and the hero, name and colour every player chose.
 
 The data is kept in a SQLite file, backend/data/games.db (set GAMES_DB to use another file).
 
     POST /api/games        save a new game
     GET  /api/games        all saved games, newest first
     GET  /api/games/{id}   one saved game
-    PUT  /api/games/{id}   replace the title and players of a saved game
+    PUT  /api/games/{id}   replace the title, style and players of a saved game
 """
 import os
 import sqlite3
@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS games (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
     mode TEXT NOT NULL,
+    style TEXT NOT NULL DEFAULT 'pixel',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -39,6 +40,7 @@ CREATE TABLE IF NOT EXISTS players (
 );
 """
 
+ArtStyleId = Literal["pixel", "cartoon", "paper_cutout", "comic"]
 HeroClassId = Literal[
     "barbarian", "bard", "cleric", "druid", "fighter", "monk",
     "paladin", "ranger", "rogue", "sorcerer", "warlock", "wizard",
@@ -55,6 +57,7 @@ class Player(BaseModel):
 class GameIn(BaseModel):
     title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=40)]
     mode: Literal["local"] = "local"
+    style: ArtStyleId = "pixel"
     players: list[Player] = Field(min_length=1, max_length=MAX_PLAYERS)
 
     @model_validator(mode="after")
@@ -84,6 +87,9 @@ def connect():
     try:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.executescript(SCHEMA)
+        columns = [column["name"] for column in connection.execute("PRAGMA table_info(games)")]
+        if "style" not in columns:  # Games saved before styles existed
+            connection.execute("ALTER TABLE games ADD COLUMN style TEXT NOT NULL DEFAULT 'pixel'")
         with connection:
             yield connection
     finally:
@@ -125,8 +131,8 @@ def create_game(game: GameIn):
     stamp = now()
     with connect() as connection:
         connection.execute(
-            "INSERT INTO games (id, title, mode, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-            (game_id, game.title, game.mode, stamp, stamp),
+            "INSERT INTO games (id, title, mode, style, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (game_id, game.title, game.mode, game.style, stamp, stamp),
         )
         write_players(connection, game_id, game.players)
         return read_game(connection, find_game(connection, game_id))
@@ -150,8 +156,8 @@ def update_game(game_id: str, game: GameIn):
     with connect() as connection:
         find_game(connection, game_id)
         connection.execute(
-            "UPDATE games SET title = ?, mode = ?, updated_at = ? WHERE id = ?",
-            (game.title, game.mode, now(), game_id),
+            "UPDATE games SET title = ?, mode = ?, style = ?, updated_at = ? WHERE id = ?",
+            (game.title, game.mode, game.style, now(), game_id),
         )
         write_players(connection, game_id, game.players)
         return read_game(connection, find_game(connection, game_id))
