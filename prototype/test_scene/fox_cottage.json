@@ -1,0 +1,14 @@
+{
+  "image": "fox_cottage.png",
+  "size": [512, 512],
+  "source": "SDXL-Turbo, prototype/tools/make_test_scene.py, prompt v2, seed 13, 4 steps (chosen by the user 2026-11-09)",
+  "caption": "Storybook illustration of a thatched stone cottage with a large leafy tree on the right, a stone gate arch on the left, small village houses behind, a cobblestone path leading into the foreground and a red fox standing on the path.",
+  "layers_back_to_front": [
+    {"name": "village houses", "box": [0, 195, 115, 280]},
+    {"name": "cottage", "box": [95, 100, 475, 330]},
+    {"name": "stone gate arch", "box": [62, 245, 150, 322]},
+    {"name": "big tree", "box": [180, 0, 512, 352]},
+    {"name": "red fox", "box": [205, 325, 375, 452]}
+  ],
+  "notes": "Boxes in pixels (x0, y0, x1, y1) on the 512 px image, drawn by hand. Background (sky, lawn, path) is not boxed."
+}
