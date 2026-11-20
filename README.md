@@ -127,6 +127,7 @@ KAGGLE_AUTO_CONNECT=0 uvicorn main:app --reload           # macOS / Linux
 
 | Endpoint | What it does | Model |
 |---|---|---|
+| `GET /health` | Check that the backend is running | – |
 | `GET /api/kaggle/status` | Current step, progress and log | – |
 | `POST /api/kaggle/connect` | Connect to Kaggle | – |
 | `POST /api/kaggle/stop` | End the Kaggle session | – |
@@ -134,6 +135,16 @@ KAGGLE_AUTO_CONNECT=0 uvicorn main:app --reload           # macOS / Linux
 | `POST /api/images/from-sketch` | Generate a picture from a sketch and text | SDXL-Turbo |
 | `POST /api/images/split` | Split a picture into layers | Qwen-Image-2.1 |
 | `POST /api/layers/edit` | Edit one layer with text | Qwen-Image-2.1 |
+| `POST /pixelize` | Give all layers the same pixel grid and colour palette | – |
+| `GET /api/games` | Get all games | – |
+| `GET /api/games/{id}` | Get one game and its players | – |
+| `POST /api/games` | Create a game | – |
+| `PUT /api/games/{id}` | Update a game | – |
+| `GET /api/saves` | Get all saves, newest first | – |
+| `GET /api/saves/{id}` | Get one save | – |
+| `POST /api/saves` | Create a save | – |
+| `PUT /api/saves/{id}` | Update a save | – |
+| `DELETE /api/saves/{id}` | Delete a save | – |
 
 The image endpoints return `503` until the connection reaches 100%. Try them at http://localhost:8000/docs.
 
