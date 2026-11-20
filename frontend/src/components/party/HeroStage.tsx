@@ -17,13 +17,17 @@ type Props = {
   onDone: (heroes: Hero[]) => void
 }
 
-/** Players take turns: each one picks a hero and locks it in, then the next player is up. */
+/** The first player who has no hero yet, or -1 when everyone has one. Players can lock in out of order. */
+const firstOpen = (party: (Hero | undefined)[], count: number) =>
+  Array.from({ length: count }, (_, i) => i).find((i) => !party[i]) ?? -1
+
+/** Each player picks a hero and locks it in. Click any player in the tray to choose or change that player's hero. */
 export default function HeroStage({ count, party, onPartyChange, onBack, onDone }: Props) {
-  const [index, setIndex] = useState(() => (party.length >= count ? 0 : party.length))
-  const [draft, setDraft] = useState<Hero>(() => (party.length >= count ? party[0] : newHero(party)))
+  const [index, setIndex] = useState(() => Math.max(0, firstOpen(party, count)))
+  const [draft, setDraft] = useState<Hero>(() => party[index] ?? newHero(party.filter(Boolean)))
   const [locking, setLocking] = useState(false)
   // A name the player typed or already locked in is kept when the class changes
-  const [nameKept, setNameKept] = useState(() => party.length >= count)
+  const [nameKept, setNameKept] = useState(() => Boolean(party[index]))
   const timer = useRef<number | undefined>(undefined)
 
   useEffect(() => () => window.clearTimeout(timer.current), [])
@@ -33,9 +37,8 @@ export default function HeroStage({ count, party, onPartyChange, onBack, onDone 
     playTheme(HERO_THEMES[draft.classId])
   }, [draft.classId])
 
-
   const chosen = heroClass(draft)
-  const others = party.filter((_, i) => i !== index)
+  const others = party.filter((hero, i) => hero && i !== index)
   const nameOk = draft.name.trim().length > 0
   const takenNames = others.map((hero) => hero.name)
 
@@ -47,7 +50,7 @@ export default function HeroStage({ count, party, onPartyChange, onBack, onDone 
 
   const goTo = (next: number, heroes: Hero[]) => {
     setIndex(next)
-    setDraft(heroes[next] ?? newHero(heroes))
+    setDraft(heroes[next] ?? newHero(heroes.filter((hero, i) => hero && i !== next)))
     setNameKept(Boolean(heroes[next]))
   }
 
@@ -60,7 +63,8 @@ export default function HeroStage({ count, party, onPartyChange, onBack, onDone 
 
     const finish = () => {
       setLocking(false)
-      if (index + 1 < count) goTo(index + 1, heroes)
+      const next = firstOpen(heroes, count)
+      if (next >= 0) goTo(next, heroes)
       else onDone(heroes)
     }
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -164,8 +168,8 @@ export default function HeroStage({ count, party, onPartyChange, onBack, onDone 
                   <button
                     type="button"
                     className={cx(styles.slot, party[i] && styles.slotLocked, i === index && styles.slotOn)}
-                    disabled={locking || !party[i]}
-                    aria-label={party[i] ? `Change ${party[i].name}` : `Player ${i + 1}`}
+                    disabled={locking}
+                    aria-label={party[i] ? `Change ${party[i].name}` : `Choose a hero for player ${i + 1}`}
                     aria-current={i === index ? 'true' : undefined}
                     onClick={() => goTo(i, party)}
                   >
