@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from pixelize import pixelize, trim, used_colors
 
 from games import router as games_router
-from party_draft import router as party_draft_router
+from saves import router as saves_router
 
 app = FastAPI(title="TTRPG Layered Scene Builder API")
 
@@ -23,7 +23,7 @@ app.add_middleware(
 )
 
 app.include_router(games_router)
-app.include_router(party_draft_router)
+app.include_router(saves_router)
 
 MAX_SIDE = 2048  # pixels; larger pictures are refused
 

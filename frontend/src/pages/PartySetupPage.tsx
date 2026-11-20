@@ -12,7 +12,7 @@ import PixelScene from '../components/pixel-scene/PixelScene'
 import { Button, StepTrail } from '../components/ui'
 import { DEFAULT_ART_STYLE, type ArtStyleId } from '../data/artStyles'
 import type { Hero } from '../data/heroes'
-import { loadDraft, storeDraft } from '../data/partyDraft'
+import { loadSave, setupSave, storeSave } from '../data/saves'
 import styles from './PartySetupPage.module.css'
 
 const STEPS = ['Mode', 'Title', 'Players', 'Heroes', 'Style', 'Set off']
@@ -33,22 +33,23 @@ export default function PartySetupPage() {
   const [muted, setMuted] = useState(isMusicMuted)
   const [saveState, setSaveState] = useState<SaveState>('saving')
   const gameId = useRef<string | null>(null)
-  const draftId = useRef<string | null>(saveToContinue())
+  const saveId = useRef<string | null>(saveToContinue())
   const [kept, setKept] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle')
 
   useEffect(() => {
-    if (!draftId.current) return
-    loadDraft(draftId.current).then((draft) => {
-      if (draft) {
-        setStep(draft.step)
-        setTitle(draft.title)
-        setCount(draft.count)
-        setParty(draft.party)
-        setStyle(draft.style)
-        gameId.current = draft.gameId
-        if (draft.gameId) setSaveState('saved')
+    if (!saveId.current) return
+    loadSave(saveId.current).then((save) => {
+      if (save) {
+        const { setup } = save
+        setStep(READY_STEP)
+        setTitle(setup.title)
+        setCount(setup.count)
+        setParty(setup.party)
+        setStyle(setup.style)
+        gameId.current = setup.gameId
+        if (setup.gameId) setSaveState('saved')
       } else {
-        draftId.current = null // The save is gone, so this becomes a new setup
+        saveId.current = null // The save is gone, so this becomes a new setup
         window.history.replaceState(null, '', '/party')
       }
       setLoading(false)
@@ -56,11 +57,12 @@ export default function PartySetupPage() {
   }, [])
 
   /** Saves the setup so far on the backend: the first time as a new save, then over that same save. */
-  const keepDraft = async () => {
+  const keepSave = async () => {
     setKept('saving')
     try {
-      draftId.current = await storeDraft(draftId.current, { step, title, count, party, style, gameId: gameId.current })
-      window.history.replaceState(null, '', `/party?save=${draftId.current}`)
+      const setup = { title, count, party, style, gameId: gameId.current }
+      saveId.current = await storeSave(saveId.current, setupSave(setup))
+      window.history.replaceState(null, '', `/party?save=${saveId.current}`)
       setKept('saved')
     } catch {
       setKept('failed')
@@ -121,7 +123,7 @@ export default function PartySetupPage() {
           <div className={styles.topActions}>
             <Button href="/">Home</Button>
             {!loading && step === READY_STEP && (
-              <Button onClick={keepDraft} disabled={kept === 'saving'}>
+              <Button onClick={keepSave} disabled={kept === 'saving'}>
                 {{ idle: 'Save', saving: 'Saving…', saved: 'Saved ✓', failed: 'Not saved' }[kept]}
               </Button>
             )}

@@ -3,10 +3,8 @@ import HeroPortrait from '../components/party/HeroPortrait'
 import PixelScene from '../components/pixel-scene/PixelScene'
 import { Button, Panel, SectionTitle } from '../components/ui'
 import { artStyle } from '../data/artStyles'
-import { deleteDraft, listDrafts, type DraftSummary } from '../data/partyDraft'
+import { deleteSave, listSaves, type SaveSummary } from '../data/saves'
 import styles from './SavesPage.module.css'
-
-const STEP_NAMES = ['Mode', 'Title', 'Players', 'Heroes', 'Style', 'Set off']
 
 const savedWhen = (time: string) =>
   new Date(time).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -28,20 +26,20 @@ function TrashIcon() {
 
 /** The saved party setups; pick one to continue it. */
 export default function SavesPage() {
-  const [saves, setSaves] = useState<DraftSummary[] | null>(null)
+  const [saves, setSaves] = useState<SaveSummary[] | null>(null)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
-    listDrafts().then(setSaves)
+    listSaves().then(setSaves)
   }, [])
 
   /** The save whose Delete was pressed once; pressing "Sure?" then deletes it. */
   const [confirming, setConfirming] = useState<string | null>(null)
 
-  const remove = async (save: DraftSummary) => {
+  const remove = async (save: SaveSummary) => {
     setConfirming(null)
     try {
-      await deleteDraft(save.id)
+      await deleteSave(save.id)
       setSaves((all) => all?.filter((s) => s.id !== save.id) ?? null)
     } catch {
       setFailed(true)
@@ -75,7 +73,7 @@ export default function SavesPage() {
                       <span className={styles.time}>{savedWhen(save.saved_at)}</span>
                     </span>
                     <span className={styles.meta}>
-                      {[save.style && artStyle(save.style).name, STEP_NAMES[save.step]].filter(Boolean).join(' · ')}
+                      {[save.style && artStyle(save.style).name, save.progress].filter(Boolean).join(' · ')}
                     </span>
                   </span>
                   <span className={styles.heroes}>

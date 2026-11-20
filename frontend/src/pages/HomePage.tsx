@@ -13,7 +13,7 @@ import {
   PageTitle,
   SiteFooter,
 } from '../components/ui'
-import { listDrafts } from '../data/partyDraft'
+import { listSaves } from '../data/saves'
 import { LAYER_GROUPS, STEPS } from '../data/homeContent'
 import { SCENE_LAYERS, type LayerId } from '../data/sceneLayers'
 import styles from './HomePage.module.css'
@@ -23,7 +23,7 @@ export default function HomePage() {
   const [saveCount, setSaveCount] = useState(0)
 
   useEffect(() => {
-    listDrafts().then((saves) => setSaveCount(saves.length))
+    listSaves().then((saves) => setSaveCount(saves.length))
   }, [])
 
   return (
