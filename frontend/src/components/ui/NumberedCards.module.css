@@ -1,0 +1,32 @@
+.list {
+  list-style: none;
+  padding: 4px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 28px;
+}
+
+.card {
+  padding: 22px;
+}
+
+.number {
+  display: block;
+  font-family: var(--pixel);
+  font-size: 14px;
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+
+.title {
+  font-family: var(--pixel);
+  font-size: 11px;
+  line-height: 1.6;
+  font-weight: 400;
+  color: var(--heading);
+  margin-bottom: 12px;
+}
+
+.text {
+  color: var(--text);
+}

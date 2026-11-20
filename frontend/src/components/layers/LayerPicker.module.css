@@ -1,0 +1,42 @@
+.picker {
+  display: grid;
+  gap: 10px;
+  padding-top: 20px;
+  border-top: 2px dashed var(--border);
+}
+
+.label {
+  font-family: var(--pixel);
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.groupName {
+  min-width: 64px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prompt {
+  min-height: 1.5em;
+  font-size: 17px;
+  color: var(--text-dim);
+}
+
+.promptKey {
+  color: var(--accent);
+}

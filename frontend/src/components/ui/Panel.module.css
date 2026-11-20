@@ -1,0 +1,17 @@
+/* Square frame with stepped corners, drawn with box-shadows */
+.panel {
+  box-shadow:
+    0 -4px 0 0 var(--border),
+    0 4px 0 0 var(--border),
+    -4px 0 0 0 var(--border),
+    4px 0 0 0 var(--border),
+    inset 0 4px 0 0 rgba(255, 255, 255, 0.04);
+}
+
+.glass {
+  background: rgba(15, 11, 26, 0.82);
+}
+
+.solid {
+  background: var(--panel);
+}

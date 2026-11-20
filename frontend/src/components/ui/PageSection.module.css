@@ -1,0 +1,9 @@
+.section {
+  padding: 72px clamp(16px, 5vw, 72px) 56px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.title {
+  margin-bottom: 36px;
+}

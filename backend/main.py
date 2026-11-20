@@ -10,6 +10,10 @@ from pydantic import BaseModel, Field
 
 from pixelize import pixelize, trim, used_colors
 
+from games import router as games_router
+from saves import router as saves_router
+
+app = FastAPI(title="TTRPG Layered Scene Builder API")
 from kaggle_connection import auto_connect as connect_kaggle
 from kaggle_connection import router as kaggle_router
 from model_api import router as model_router
@@ -31,6 +35,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(games_router)
+app.include_router(saves_router)
 app.include_router(kaggle_router)
 app.include_router(model_router)
 

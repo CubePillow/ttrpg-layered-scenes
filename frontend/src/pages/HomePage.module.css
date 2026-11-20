@@ -1,0 +1,13 @@
+/* Spacing between the parts of the home page panel */
+.eyebrow {
+  margin-bottom: 18px;
+}
+
+.lede {
+  margin-top: 18px;
+}
+
+.actions,
+.layers {
+  margin-top: 26px;
+}

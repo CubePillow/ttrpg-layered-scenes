@@ -1,0 +1,161 @@
+.page {
+  position: relative;
+  min-height: 100svh;
+}
+
+.scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 67% 100%;
+  image-rendering: pixelated;
+}
+
+.shade {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 6, 12, 0.55);
+}
+
+.content {
+  position: relative;
+  min-height: 100svh;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  padding: 28px clamp(12px, 4vw, 48px);
+}
+
+.panel {
+  width: min(100%, 640px);
+  display: grid;
+  gap: 14px;
+  padding: clamp(14px, 2.5vw, 22px);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+  max-height: 60svh;
+  overflow-y: auto;
+}
+
+.save {
+  position: relative;
+}
+
+.card {
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.card:hover,
+.card:focus-visible {
+  border-color: var(--accent, #f5a623);
+  background: rgba(255, 255, 255, 0.06);
+  outline: none;
+}
+
+.heroes {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.head {
+  /* Heads are not all the same width; equal boxes keep the row evenly spaced */
+  width: 54px;
+  height: 54px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-right: 4px;
+}
+
+.title {
+  font-size: 1.05em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.time,
+.meta {
+  font-size: 0.8em;
+  opacity: 0.65;
+}
+
+.time {
+  flex-shrink: 0;
+}
+
+.meta {
+
+}
+
+.remove {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  display: flex;
+  gap: 6px;
+}
+
+.remove button {
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 0.8em;
+  color: inherit;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  opacity: 0.75;
+  cursor: pointer;
+}
+
+.remove button:hover,
+.remove button:focus-visible {
+  opacity: 1;
+}
+
+.error {
+  color: #ff8a80;
+}
+
+.remove .danger {
+  color: #ff8a80;
+  border-color: #ff8a80;
+  opacity: 1;
+}
+
