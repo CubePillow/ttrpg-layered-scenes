@@ -38,3 +38,12 @@
   gap: 22px;
   padding: 28px clamp(12px, 4vw, 48px);
 }
+
+.topActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.loading {
+  text-align: center;
+}

@@ -12,6 +12,7 @@ import PixelScene from '../components/pixel-scene/PixelScene'
 import { Button, StepTrail } from '../components/ui'
 import { DEFAULT_ART_STYLE, type ArtStyleId } from '../data/artStyles'
 import type { Hero } from '../data/heroes'
+import { loadDraft, storeDraft } from '../data/partyDraft'
 import styles from './PartySetupPage.module.css'
 
 const STEPS = ['Mode', 'Title', 'Players', 'Heroes', 'Style', 'Set off']
@@ -19,7 +20,11 @@ const HERO_STEP = 3
 const STYLE_STEP = 4
 const READY_STEP = 5
 
+/** /party?save=<id> continues that save; plain /party starts a new setup. */
+const saveToContinue = () => new URLSearchParams(window.location.search).get('save')
+
 export default function PartySetupPage() {
+  const [loading, setLoading] = useState(() => saveToContinue() !== null)
   const [step, setStep] = useState(0)
   const [title, setTitle] = useState('')
   const [count, setCount] = useState(1)
@@ -28,6 +33,40 @@ export default function PartySetupPage() {
   const [muted, setMuted] = useState(isMusicMuted)
   const [saveState, setSaveState] = useState<SaveState>('saving')
   const gameId = useRef<string | null>(null)
+  const draftId = useRef<string | null>(saveToContinue())
+  const [kept, setKept] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle')
+
+  useEffect(() => {
+    if (!draftId.current) return
+    loadDraft(draftId.current).then((draft) => {
+      if (draft) {
+        setStep(draft.step)
+        setTitle(draft.title)
+        setCount(draft.count)
+        setParty(draft.party)
+        setStyle(draft.style)
+        gameId.current = draft.gameId
+        if (draft.gameId) setSaveState('saved')
+      } else {
+        draftId.current = null // The save is gone, so this becomes a new setup
+        window.history.replaceState(null, '', '/party')
+      }
+      setLoading(false)
+    })
+  }, [])
+
+  /** Saves the setup so far on the backend: the first time as a new save, then over that same save. */
+  const keepDraft = async () => {
+    setKept('saving')
+    try {
+      draftId.current = await storeDraft(draftId.current, { step, title, count, party, style, gameId: gameId.current })
+      window.history.replaceState(null, '', `/party?save=${draftId.current}`)
+      setKept('saved')
+    } catch {
+      setKept('failed')
+    }
+    setTimeout(() => setKept('idle'), 1500)
+  }
   const saves = useRef(Promise.resolve())
 
   // Quiet music throughout; while choosing a hero, that hero's theme plays instead
@@ -79,22 +118,31 @@ export default function PartySetupPage() {
       <main className={styles.content}>
         <div className={styles.topBar}>
           <StepTrail steps={STEPS} current={step} />
-          <Button aria-pressed={!muted} onClick={toggleMusic}>
-            {muted ? 'Music on' : 'Mute'}
-          </Button>
+          <div className={styles.topActions}>
+            <Button href="/">Home</Button>
+            {!loading && step === READY_STEP && (
+              <Button onClick={keepDraft} disabled={kept === 'saving'}>
+                {{ idle: 'Save', saving: 'Saving…', saved: 'Saved ✓', failed: 'Not saved' }[kept]}
+              </Button>
+            )}
+            <Button aria-pressed={!muted} onClick={toggleMusic}>
+              {muted ? 'Music on' : 'Mute'}
+            </Button>
+          </div>
         </div>
-        {step === 0 && <ModeStage onLocal={() => setStep(1)} />}
-        {step === 1 && (
+        {loading && <p className={styles.loading}>Loading your saved party…</p>}
+        {!loading && step === 0 && <ModeStage onLocal={() => setStep(1)} />}
+        {!loading && step === 1 && (
           <CampaignStage title={title} onTitleChange={setTitle} onNext={() => setStep(2)} onBack={() => setStep(0)} />
         )}
-        {step === 2 && <CountStage onChoose={chooseCount} onBack={() => setStep(1)} />}
-        {step === HERO_STEP && (
+        {!loading && step === 2 && <CountStage onChoose={chooseCount} onBack={() => setStep(1)} />}
+        {!loading && step === HERO_STEP && (
           <HeroStage count={count} party={party} onPartyChange={setParty} onBack={() => setStep(2)} onDone={finishParty} />
         )}
-        {step === STYLE_STEP && (
+        {!loading && step === STYLE_STEP && (
           <StyleStage selected={style} onChoose={chooseStyle} onBack={() => setStep(HERO_STEP)} />
         )}
-        {step === READY_STEP && (
+        {!loading && step === READY_STEP && (
           <ReadyStage
             title={title.trim()}
             style={style}
