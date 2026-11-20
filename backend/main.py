@@ -1,6 +1,7 @@
 import base64
 import binascii
 import io
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,7 +10,18 @@ from pydantic import BaseModel, Field
 
 from pixelize import pixelize, trim, used_colors
 
-app = FastAPI(title="TTRPG Layered Scene Builder API")
+from kaggle_connection import auto_connect as connect_kaggle
+from kaggle_connection import router as kaggle_router
+from model_api import router as model_router
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    connect_kaggle()
+    yield
+
+
+app = FastAPI(title="TTRPG Layered Scene Builder API", lifespan=lifespan)
 
 # Allow the Vite dev server (frontend) to call this API
 app.add_middleware(
@@ -18,6 +30,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(kaggle_router)
+app.include_router(model_router)
 
 MAX_SIDE = 2048  # pixels; larger pictures are refused
 

@@ -55,3 +55,6 @@ experiments/p1*/
 experiments/p2*/
 experiments/p3*/
 experiments/r2_*/
+
+# ---------- Backend tests ----------
+backend/tests/output/
