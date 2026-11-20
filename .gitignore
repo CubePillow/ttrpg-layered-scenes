@@ -31,9 +31,12 @@ generated/
 .DS_Store
 Thumbs.db
 
+# ---------- Backend tests ----------
+backend/tests/output/
+backend/tests/image/*
+!backend/tests/image/README.md
+
 # ---------- Prototype (Python) ----------
-__pycache__/
-*.pyc
 prototype/config.json
 prototype/scenes/
 prototype/crash.log
