@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from games import router as games_router
+from party_draft import router as party_draft_router
 
 app = FastAPI(title="TTRPG Layered Scene Builder API")
 
@@ -14,6 +15,7 @@ app.add_middleware(
 )
 
 app.include_router(games_router)
+app.include_router(party_draft_router)
 
 
 @app.get("/health")
