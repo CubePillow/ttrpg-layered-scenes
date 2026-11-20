@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import LayerPicker from '../components/layers/LayerPicker'
 import PixelScene from '../components/pixel-scene/PixelScene'
 import {
@@ -13,12 +13,18 @@ import {
   PageTitle,
   SiteFooter,
 } from '../components/ui'
+import { listDrafts } from '../data/partyDraft'
 import { LAYER_GROUPS, STEPS } from '../data/homeContent'
 import { SCENE_LAYERS, type LayerId } from '../data/sceneLayers'
 import styles from './HomePage.module.css'
 
 export default function HomePage() {
   const [active, setActive] = useState<LayerId | null>(null)
+  const [saveCount, setSaveCount] = useState(0)
+
+  useEffect(() => {
+    listDrafts().then((saves) => setSaveCount(saves.length))
+  }, [])
 
   return (
     <>
@@ -33,8 +39,15 @@ export default function HomePage() {
         </Lede>
         <ButtonGroup className={styles.actions}>
           <Button variant="primary" href="/party">
-            Start a scene
+            New story
           </Button>
+          {saveCount > 0 ? (
+            <Button href="/saves">Load story</Button>
+          ) : (
+            <Button disabled title="No saves yet: press Save when your party is ready">
+              Load story
+            </Button>
+          )}
           <Button href="#how">How it works</Button>
         </ButtonGroup>
 

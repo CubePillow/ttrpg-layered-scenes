@@ -7,7 +7,7 @@ type Props = {
   onLocal: () => void
 }
 
-/** First screen after Start a scene: play on one screen or online. */
+/** First screen after New story: play on one screen or online. */
 export default function ModeStage({ onLocal }: Props) {
   return (
     <Panel className={styles.mode}>
