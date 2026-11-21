@@ -10,7 +10,6 @@ A save is a JSON object in layers, so later parts of the game add to it without 
         "act": 2,                                    # the act being played, from 1
         "actState": "writing" | "drawn",             # where that act stands
         "story": [{"heroId", "text"}, ...],          # the shared story text, in pieces by who wrote them
-        "acts": [{"number", "from", "to", "prompt", "pictureId"}, ...]  # drawn acts and their part of the text
       }
     }
 
@@ -96,15 +95,9 @@ def progress(data: dict) -> str:
         play = data.get("play") or {}
         if play.get("act") and play.get("actState") in ACT_STATES:
             return f"Act {play['act']} · {play['actState'].capitalize()}"
-        acts = play.get("acts") if isinstance(play.get("acts"), list) else None
-        if acts is None:  # Saved before acts
-            return f"Scene {play['scene']}" if play.get("scene") else "Playing"
-        pieces = play.get("story") if isinstance(play.get("story"), list) else []
-        written = sum(len(p.get("text", "")) for p in pieces if isinstance(p, dict))
-        drawn_to = acts[-1].get("to", 0) if acts and isinstance(acts[-1], dict) else 0
-        if acts and written <= drawn_to:
-            return f"Act {len(acts)} · Drawn"
-        return f"Act {len(acts) + 1} · Writing"
+        if play.get("scene"):  # Saved before acts
+            return f"Scene {play['scene']}"
+        return "Playing"
     return "Set off"  # A setup is only saved on its last step
 
 

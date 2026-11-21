@@ -4,7 +4,7 @@ import PixelScene from '../components/pixel-scene/PixelScene'
 import { Badge, Button, Panel, SectionTitle } from '../components/ui'
 import { canDictate, useDictation } from '../audio/useDictation'
 import VoiceMeter from '../components/ui/VoiceMeter'
-import { loadSave, storeSave, type Save, type ActSave, type ActState } from '../data/saves'
+import { loadSave, storeSave, type Save, type ActState } from '../data/saves'
 import { editStory, storyText, wordsByHero, type StoryPiece } from '../data/story'
 import styles from './StoryPage.module.css'
 
@@ -32,9 +32,6 @@ export default function StoryPage() {
   const typingTimer = useRef<number | undefined>(undefined)
   /** The portrait flag fades once the writer has been still for a moment */
   const [active, setActive] = useState(true)
-  /** The acts drawn so far (on the picture page); the text after the last one is the act being written */
-  const [acts, setActs] = useState<ActSave[]>([])
-  const actsNow = useRef<ActSave[]>([])
   const activeTimer = useRef<number | undefined>(undefined)
   const wake = () => {
     setActive(true)
@@ -60,7 +57,6 @@ export default function StoryPage() {
       if (!loaded) return setMissing(true)
       setSave(loaded)
       setPieces(loaded.play?.story ?? [])
-      setActs((actsNow.current = loaded.play?.acts ?? []))
       setWriter(loaded.setup.party[0]?.id ?? null)
     })
   }, [])
@@ -73,12 +69,10 @@ export default function StoryPage() {
     const saveTo = id.current
     timer.current = window.setTimeout(async () => {
       try {
-        const drawn = actsNow.current
-        const { number: act, state: actState } = currentAct(drawn, storyText(next).length)
         await storeSave(saveTo, {
           ...save,
           phase: 'playing',
-          play: { ...save.play, act, actState, story: next, acts: drawn },
+          play: { ...save.play, act: save.play?.act ?? 1, actState: save.play?.actState ?? 'writing', story: next },
         })
         setSaveState('saved')
       } catch {
@@ -87,20 +81,8 @@ export default function StoryPage() {
     }, delay)
   }
 
-  /** Text in acts already drawn is locked, so each act keeps the words its picture was made from */
-  const [lockNote, setLockNote] = useState(false)
-  const lockTimer = useRef<number | undefined>(undefined)
-
   const type = (text: string) => {
     if (!writer) return
-    const old = storyText(pieces)
-    const lockedTo = Math.min(actsNow.current[actsNow.current.length - 1]?.to ?? 0, old.length)
-    if (text.slice(0, lockedTo) !== old.slice(0, lockedTo)) {
-      setLockNote(true)
-      window.clearTimeout(lockTimer.current)
-      lockTimer.current = window.setTimeout(() => setLockNote(false), 2500)
-      return
-    }
     const next = editStory(pieces, text, writer)
     setPieces(next)
     keep(next)
@@ -137,24 +119,18 @@ export default function StoryPage() {
   const counts = wordsByHero(pieces)
   const totalWords = Object.values(counts).reduce((sum, n) => sum + n, 0)
 
-  const now = currentAct(acts, text.length)
-  const lockedTo = Math.min(acts[acts.length - 1]?.to ?? 0, text.length)
-  /** Draws pieces that start at `offset` in the text; the part in drawn acts is shown dimmer. */
-  const paint = (list: StoryPiece[], offset: number, key: string) => {
-    const { before, after } = piecesAround(list, lockedTo - offset)
-    return [
-      ...before.map((piece, i) => (
-        <span key={`${key}l${i}`} className={styles.locked} style={{ color: color(piece.heroId) }}>
-          {piece.text}
-        </span>
-      )),
-      ...after.map((piece, i) => (
-        <span key={`${key}${i}`} style={{ color: color(piece.heroId) }}>
-          {piece.text}
-        </span>
-      )),
-    ]
+  /** The act being played; it moves on once drawing is built */
+  const now: { number: number; state: ActState } = {
+    number: save.play?.act ?? 1,
+    state: save.play?.actState ?? 'writing',
   }
+  /** Draws pieces in their writers' colours */
+  const paint = (list: StoryPiece[], key: string) =>
+    list.map((piece, i) => (
+      <span key={`${key}${i}`} style={{ color: color(piece.heroId) }}>
+        {piece.text}
+      </span>
+    ))
 
   const writing = party.find((h) => h.id === writer)
 
@@ -218,13 +194,11 @@ export default function StoryPage() {
         )}
       </div>
       {/* Shown only when something is going on; the field's placeholder already says how to write */}
-      {(lockNote || dictation.error || dictation.listening) && (
+      {(dictation.error || dictation.listening) && (
         <p className={dictation.listening ? `${styles.hint} ${styles.listening}` : styles.hint} role="status">
-          {lockNote
-            ? `Acts already drawn are locked. Write on after act ${acts.length}.`
-            : dictation.error
-              ? `${dictation.error}. You can still type in the box.`
-              : dictation.heard || `Listening to ${writing?.name ?? 'you'}… speak now, then press ■ to finish.`}
+          {dictation.error
+            ? `${dictation.error}. You can still type in the box.`
+            : dictation.heard || `Listening to ${writing?.name ?? 'you'}… speak now, then press ■ to finish.`}
         </p>
       )}
       <div
@@ -232,7 +206,7 @@ export default function StoryPage() {
         style={{ '--writer': writing?.color } as CSSProperties}
       >
         <div ref={mirror} className={styles.mirror} aria-hidden="true">
-          {paint(piecesAround(pieces, caret).before, 0, 'b')}
+          {paint(piecesAround(pieces, caret).before, 'b')}
           {showCursor && writing && (
             <span ref={marker} className={below ? `${styles.marker} ${styles.below}` : styles.marker}>
               <span
@@ -249,7 +223,7 @@ export default function StoryPage() {
               </span>
             </span>
           )}
-          {paint(piecesAround(pieces, caret).after, caret, 'a')}
+          {paint(piecesAround(pieces, caret).after, 'a')}
           {/* Keeps a last empty line the same height as in the field */}
           {'​'}
         </div>
@@ -303,13 +277,6 @@ function piecesAround(pieces: StoryPiece[], at: number) {
     from += piece.text.length
   }
   return { before, after }
-}
-
-/** The act being played: the one after the last drawn act once new text is written, else the last drawn one. */
-function currentAct(acts: ActSave[], written: number): { number: number; state: ActState } {
-  const last = acts[acts.length - 1]
-  if (last && written <= last.to) return { number: last.number, state: 'drawn' }
-  return { number: acts.length + 1, state: 'writing' }
 }
 
 /** A small pixel paintbrush. */

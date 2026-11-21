@@ -19,10 +19,7 @@ export type SetupSave = {
   gameId: string | null
 }
 
-/** Play: the shared story text and the acts drawn from it. Pictures go in by id, never as image data. */
-/** A drawn act: its part of the story text, the prompt the picture was made from, and the picture's id. */
-export type ActSave = { number: number; from: number; to: number; prompt: string; pictureId: string }
-
+/** Play: the shared story text and the act being played. */
 /** Where the act being played stands: still being written, or drawn */
 export type ActState = 'writing' | 'drawn'
 
@@ -33,7 +30,6 @@ export type PlaySave = {
   scene?: number
   actState?: ActState
   story?: StoryPiece[]
-  acts?: ActSave[]
 } & Record<string, unknown>
 
 export type Save = {

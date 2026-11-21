@@ -355,11 +355,6 @@
   }
 }
 
-/* Text of scenes already drawn: it can be read but not changed */
-.locked {
-  opacity: 0.55;
-}
-
 .drawRow {
   display: flex;
 }

@@ -42,11 +42,9 @@ def test_the_list_shows_title_style_heroes_and_progress():
         ("playing", {"scene": 3}, "Scene 3"),
         ("playing", None, "Playing"),
         ("ended", {"scene": 7}, "Finished"),
-        ("playing", {"act": 1, "story": [], "acts": []}, "Act 1 · Writing"),
-        ("playing", {"act": 1, "story": [{"heroId": "h1", "text": "abc"}], "acts": [{"to": 3}]}, "Act 1 · Drawn"),
-        ("playing", {"act": 2, "story": [{"heroId": "h1", "text": "abcdef"}], "acts": [{"to": 3}]}, "Act 2 · Writing"),
+        ("playing", {"act": 1, "actState": "writing", "story": []}, "Act 1 · Writing"),
         ("playing", {"act": 4, "actState": "drawn"}, "Act 4 · Drawn"),
-        ("playing", {"act": 4, "actState": "lost", "acts": []}, "Act 1 · Writing"),
+        ("playing", {"act": 4, "actState": "lost"}, "Playing"),
     ],
 )
 def test_progress_follows_the_phase(phase, play, progress):
