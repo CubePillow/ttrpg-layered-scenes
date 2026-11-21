@@ -12,7 +12,6 @@ from pixelize import pixelize, trim, used_colors
 
 from games import router as games_router
 from saves import router as saves_router
-from pictures import router as pictures_router
 
 app = FastAPI(title="TTRPG Layered Scene Builder API")
 from kaggle_connection import auto_connect as connect_kaggle
@@ -38,7 +37,6 @@ app.add_middleware(
 
 app.include_router(games_router)
 app.include_router(saves_router)
-app.include_router(pictures_router)
 app.include_router(kaggle_router)
 app.include_router(model_router)
 

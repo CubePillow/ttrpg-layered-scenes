@@ -30,7 +30,6 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Request
 
 from games import connect, now
-from pictures import delete_pictures_of
 
 router = APIRouter(prefix="/api/saves", tags=["saves"])
 
@@ -170,4 +169,3 @@ def delete_save(save_id: str):
     with connect() as connection:
         open_saves(connection)
         connection.execute("DELETE FROM saves WHERE id = ?", (save_id,))
-        delete_pictures_of(connection, save_id)
