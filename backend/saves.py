@@ -6,7 +6,12 @@ A save is a JSON object in layers, so later parts of the game add to it without 
       "version": 2,
       "phase": "setup" | "playing" | "ended",
       "setup": {"title", "count", "party", "style", "gameId"},   # the party, saved on its last step
-      "play": null | {...}                                              # filled in once play is built
+      "play": null | {
+        "act": 2,                                    # the act being played, from 1
+        "actState": "writing" | "drawn",             # where that act stands
+        "story": [{"heroId", "text"}, ...],          # the shared story text, in pieces by who wrote them
+        "acts": [{"number", "from", "to", "prompt", "pictureId"}, ...]  # drawn acts and their part of the text
+      }
     }
 
 Saves written before this layout (version 1: the setup fields at the top level) are upgraded when they are read,
@@ -25,12 +30,14 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Request
 
 from games import connect, now
+from pictures import delete_pictures_of
 
 router = APIRouter(prefix="/api/saves", tags=["saves"])
 
 VERSION = 2
 PHASES = ("setup", "playing", "ended")
 SETUP_KEYS = ("title", "count", "party", "style", "gameId")
+ACT_STATES = ("writing", "drawn")
 MAX_BYTES = 200_000  # Text only; a long story is still far below this
 
 SCHEMA = """
@@ -87,8 +94,18 @@ def progress(data: dict) -> str:
     if data["phase"] == "ended":
         return "Finished"
     if data["phase"] == "playing":
-        scene = (data.get("play") or {}).get("scene")
-        return f"Scene {scene}" if scene else "Playing"
+        play = data.get("play") or {}
+        if play.get("act") and play.get("actState") in ACT_STATES:
+            return f"Act {play['act']} · {play['actState'].capitalize()}"
+        acts = play.get("acts") if isinstance(play.get("acts"), list) else None
+        if acts is None:  # Saved before acts
+            return f"Scene {play['scene']}" if play.get("scene") else "Playing"
+        pieces = play.get("story") if isinstance(play.get("story"), list) else []
+        written = sum(len(p.get("text", "")) for p in pieces if isinstance(p, dict))
+        drawn_to = acts[-1].get("to", 0) if acts and isinstance(acts[-1], dict) else 0
+        if acts and written <= drawn_to:
+            return f"Act {len(acts)} · Drawn"
+        return f"Act {len(acts) + 1} · Writing"
     return "Set off"  # A setup is only saved on its last step
 
 
@@ -153,3 +170,4 @@ def delete_save(save_id: str):
     with connect() as connection:
         open_saves(connection)
         connection.execute("DELETE FROM saves WHERE id = ?", (save_id,))
+        delete_pictures_of(connection, save_id)
