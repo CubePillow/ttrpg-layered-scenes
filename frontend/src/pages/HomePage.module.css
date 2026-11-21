@@ -11,3 +11,22 @@
 .layers {
   margin-top: 26px;
 }
+
+/* The three choices side by side, the same width */
+.actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.actions > * {
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  .actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
