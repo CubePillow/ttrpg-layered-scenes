@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { Accent, Badge, Button, ButtonGroup, Eyebrow, PageTitle, Panel } from '../ui'
+import { Accent, Button, ButtonGroup, Eyebrow, PageTitle, Panel } from '../ui'
 import { artStyle, type ArtStyleId } from '../../data/artStyles'
 import { heroClass, type Hero } from '../../data/heroes'
 import HeroSprite from './HeroSprite'
@@ -15,6 +15,7 @@ type Props = {
   onRetrySave: () => void
   onChangeParty: () => void
   onChangeStyle: () => void
+  onBegin: () => void
 }
 
 const SAVE_MESSAGE: Record<SaveState, string> = {
@@ -24,7 +25,7 @@ const SAVE_MESSAGE: Record<SaveState, string> = {
 }
 
 /** Last step: the whole party lined up, ready to set off. */
-export default function ReadyStage({ title, style, party, saveState, onRetrySave, onChangeParty, onChangeStyle }: Props) {
+export default function ReadyStage({ title, style, party, saveState, onRetrySave, onChangeParty, onChangeStyle, onBegin }: Props) {
   return (
     <Panel className={styles.ready}>
       <Eyebrow>The party is ready</Eyebrow>
@@ -49,8 +50,8 @@ export default function ReadyStage({ title, style, party, saveState, onRetrySave
         <Button onClick={onChangeParty}>Change the party</Button>
         <Button onClick={onChangeStyle}>Change the style</Button>
         {saveState === 'failed' && <Button onClick={onRetrySave}>Try again</Button>}
-        <Button variant="primary" disabled>
-          Begin the adventure <Badge>soon</Badge>
+        <Button variant="primary" onClick={onBegin}>
+          Begin the adventure
         </Button>
       </ButtonGroup>
     </Panel>

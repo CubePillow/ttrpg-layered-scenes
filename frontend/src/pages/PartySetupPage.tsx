@@ -69,6 +69,20 @@ export default function PartySetupPage() {
     }
     setTimeout(() => setKept('idle'), 1500)
   }
+  /** Saves the story as started and opens the shared story page. */
+  const begin = async () => {
+    try {
+      const setup = { title: title.trim(), count, party, style, gameId: gameId.current }
+      const id = await storeSave(saveId.current, {
+        ...setupSave(setup),
+        phase: 'playing',
+        play: { act: 1, actState: 'writing', story: [] },
+      })
+      window.location.assign(`/story?save=${id}`)
+    } catch {
+      setKept('failed')
+    }
+  }
   const saves = useRef(Promise.resolve())
 
   // Quiet music throughout; while choosing a hero, that hero's theme plays instead
@@ -153,6 +167,7 @@ export default function PartySetupPage() {
             onRetrySave={() => save(style)}
             onChangeParty={() => setStep(HERO_STEP)}
             onChangeStyle={() => setStep(STYLE_STEP)}
+            onBegin={begin}
           />
         )}
       </main>
