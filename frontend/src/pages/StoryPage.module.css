@@ -216,7 +216,7 @@
   position: absolute;
   inset: 0;
   margin: 0;
-  padding: 30px 22px 18px;
+  padding: 18px 22px;
   border: 0;
   font: 1.05rem/1.8 system-ui, sans-serif;
   letter-spacing: normal;
@@ -272,21 +272,55 @@
 
 .follower {
   position: absolute;
-  left: -3px;
-  bottom: 1.1em;
+  left: -6px;
+  bottom: calc(1.1em + 5px);
   display: block;
-  padding: 1px;
-  border-radius: 3px 3px 3px 0;
-  background: var(--writer, #fff);
+  padding: 3px;
+  border: 2px solid var(--writer, #fff);
+  border-radius: 7px;
+  background: transparent; /* Only the frame and the portrait show, so letters behind stay readable */
   line-height: 0;
   filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.5));
   transform-origin: bottom left;
   animation: pop 0.2s ease-out;
-  transition: opacity 0.4s;
+  transition: border-color 0.4s;
+}
+
+/* The speech bubble's tail, pointing down at the cursor */
+.follower::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  bottom: -7px;
+  border-style: solid;
+  border-width: 7px 5px 0 1px;
+  border-color: var(--writer, #fff) transparent transparent transparent;
+}
+
+/* On the first line: the bubble hangs under the cursor, its tail pointing up */
+.below .follower {
+  bottom: auto;
+  top: calc(1.3em + 5px);
+  transform-origin: top left;
+}
+
+.below .follower::after {
+  bottom: auto;
+  top: -7px;
+  border-width: 0 5px 7px 1px;
+  border-color: transparent transparent var(--writer, #fff) transparent;
+}
+
+.below .idle::after {
+  border-bottom-color: color-mix(in srgb, var(--writer, #fff) 35%, transparent);
 }
 
 .idle {
-  opacity: 0.3;
+  border-color: color-mix(in srgb, var(--writer, #fff) 35%, transparent);
+}
+
+.idle::after {
+  border-top-color: color-mix(in srgb, var(--writer, #fff) 35%, transparent);
 }
 
 .busy {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import HeroPortrait from '../components/party/HeroPortrait'
 import PixelScene from '../components/pixel-scene/PixelScene'
 import { Badge, Button, Panel, SectionTitle } from '../components/ui'
@@ -42,6 +42,14 @@ export default function StoryPage() {
     activeTimer.current = window.setTimeout(() => setActive(false), 1500)
   }
   const timer = useRef<number | undefined>(undefined)
+  /** On the first line there is no room above the cursor, so the bubble goes below it instead */
+  const marker = useRef<HTMLSpanElement>(null)
+  const [below, setBelow] = useState(false)
+  const [scrolled, setScrolled] = useState(0)
+  useLayoutEffect(() => {
+    if (!marker.current || !mirror.current) return
+    setBelow(marker.current.offsetTop - mirror.current.scrollTop < 36)
+  }, [caret, pieces, focused, writer, scrolled])
 
   useEffect(() => {
     if (!id.current) {
@@ -226,7 +234,7 @@ export default function StoryPage() {
         <div ref={mirror} className={styles.mirror} aria-hidden="true">
           {paint(piecesAround(pieces, caret).before, 0, 'b')}
           {showCursor && writing && (
-            <span className={styles.marker}>
+            <span ref={marker} className={below ? `${styles.marker} ${styles.below}` : styles.marker}>
               <span
                 key={writing.id}
                 className={[
@@ -237,7 +245,7 @@ export default function StoryPage() {
                   .filter(Boolean)
                   .join(' ')}
               >
-                <HeroPortrait classId={writing.classId} color={writing.color} scale={2} label={writing.name} />
+                <HeroPortrait classId={writing.classId} color={writing.color} scale={1.4} label={writing.name} />
               </span>
             </span>
           )}
@@ -269,6 +277,7 @@ export default function StoryPage() {
           onBlur={() => setFocused(false)}
           onScroll={(e) => {
             if (mirror.current) mirror.current.scrollTop = e.currentTarget.scrollTop
+            setScrolled(e.currentTarget.scrollTop)
           }}
         />
       </div>
