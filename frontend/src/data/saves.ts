@@ -4,6 +4,7 @@
  */
 import type { ArtStyleId } from './artStyles'
 import type { Hero } from './heroes'
+import type { StoryPiece } from './story'
 
 export const SAVE_VERSION = 2
 
@@ -18,8 +19,18 @@ export type SetupSave = {
   gameId: string | null
 }
 
-/** Play is not built yet; it will hold the scenes, actions and rolls. Pictures go in by id, never as image data. */
-export type PlaySave = { scene: number } & Record<string, unknown>
+/** Play: the shared story text and the act being played. */
+/** Where the act being played stands: still being written, or drawn */
+export type ActState = 'writing' | 'drawn'
+
+export type PlaySave = {
+  /** The act being played, from 1 */
+  act?: number
+  /** Kept for saves from before acts */
+  scene?: number
+  actState?: ActState
+  story?: StoryPiece[]
+} & Record<string, unknown>
 
 export type Save = {
   version: typeof SAVE_VERSION
@@ -34,7 +45,7 @@ export type SaveSummary = {
   saved_at: string
   title: string
   phase: SavePhase
-  /** A few words on how far the story got, such as "Set off" or "Scene 3" */
+  /** A few words on how far the story got, such as "Set off" or "Act 2 · Writing" */
   progress: string
   style: ArtStyleId | null
   heroes: Pick<Hero, 'name' | 'classId' | 'color'>[]

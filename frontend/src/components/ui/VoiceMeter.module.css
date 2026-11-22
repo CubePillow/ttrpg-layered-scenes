@@ -1,0 +1,14 @@
+.meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
+}
+
+.bar {
+  width: 3px;
+  height: 100%;
+  background: currentColor;
+  transform: scaleY(0.15);
+  transition: transform 0.06s linear;
+}

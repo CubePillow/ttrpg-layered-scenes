@@ -1,0 +1,365 @@
+.page {
+  position: relative;
+  min-height: 100svh;
+}
+
+.scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 67% 100%;
+  image-rendering: pixelated;
+}
+
+.shade {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 6, 12, 0.55);
+}
+
+.content {
+  position: relative;
+  min-height: 100svh;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 14px;
+  padding: 28px clamp(12px, 4vw, 48px);
+}
+
+.panel {
+  width: min(100%, 760px);
+  display: grid;
+  gap: 14px;
+  padding: clamp(14px, 2.5vw, 22px);
+}
+
+.topBar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  width: min(100%, 760px);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.title {
+  margin: 0;
+}
+
+/* Which act is being played, and whether it is still being written or already drawn */
+.actTag {
+  padding: 3px 10px;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.actTag[data-state='drawn'] {
+  border-style: solid;
+  border-color: #7fcf62;
+}
+
+/* Total words, in the bottom right corner of the box */
+.total {
+  position: absolute;
+  right: 22px;
+  bottom: 6px;
+  z-index: 1;
+  font-size: 0.75rem;
+  opacity: 0.55;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Like a document toolbar: who is writing now, and how */
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.label {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.writers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.writer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--hero);
+  font: inherit;
+  cursor: pointer;
+}
+
+.count {
+  min-width: 1.6em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--hero) 25%, rgba(0, 0, 0, 0.4));
+  color: #fff;
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.writer[aria-checked='true'] {
+  border-color: var(--hero);
+  background: color-mix(in srgb, var(--hero) 18%, transparent);
+}
+
+/* Voice input: a mic button that turns into a live "listening" pill with a level meter and a stop square */
+.mic {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 6px 12px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.mic:hover {
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.micOn {
+  border-color: var(--writer, #e05252);
+  background: color-mix(in srgb, var(--writer, #e05252) 22%, transparent);
+  color: var(--writer, #e05252);
+}
+
+.stop {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--writer, #e05252);
+  color: #111;
+  font-size: 0.55rem;
+}
+
+.hint {
+  margin: -4px 0 0;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.listening {
+  font-style: italic;
+  opacity: 1;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* The field's own text is clear; the coloured copy behind it shows through, in the same place. */
+.editor {
+  position: relative;
+  height: min(55svh, 480px);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-left: 4px solid var(--writer, rgba(255, 255, 255, 0.3));
+  background: rgba(0, 0, 0, 0.4);
+  transition: border-color 0.15s;
+}
+
+.editor:focus-within {
+  border-color: var(--writer, rgba(255, 255, 255, 0.4));
+}
+
+.editorListening {
+  border-color: var(--writer, rgba(255, 255, 255, 0.4));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--writer, #fff) 35%, transparent);
+}
+
+.editorListening::after {
+  content: 'Listening…';
+  position: absolute;
+  left: 14px;
+  bottom: 8px;
+  font-size: 0.75rem;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.mirror,
+.field {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 18px 22px;
+  border: 0;
+  font: 1.05rem/1.8 system-ui, sans-serif;
+  letter-spacing: normal;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  box-sizing: border-box;
+}
+
+.mirror {
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.field {
+  width: 100%;
+  height: 100%;
+  resize: none;
+  background: transparent;
+  color: transparent;
+  outline: none;
+}
+
+.field::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.field::selection {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* The cursor: a bar in the writer's colour, with their portrait as a flag on top */
+.marker {
+  position: relative;
+  display: inline-block;
+  width: 0;
+  height: 1em;
+  vertical-align: baseline;
+}
+
+.marker::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: -0.2em;
+  width: 2px;
+  height: 1.35em;
+  background: var(--writer, #fff);
+  box-shadow: 0 0 4px var(--writer, #fff);
+  animation: blink 1.1s steps(1) infinite;
+}
+
+.follower {
+  position: absolute;
+  left: -6px;
+  bottom: calc(1.1em + 5px);
+  display: block;
+  padding: 3px;
+  border: 2px solid var(--writer, #fff);
+  border-radius: 7px;
+  background: transparent; /* Only the frame and the portrait show, so letters behind stay readable */
+  line-height: 0;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.5));
+  transform-origin: bottom left;
+  animation: pop 0.2s ease-out;
+  transition: border-color 0.4s;
+}
+
+/* The speech bubble's tail, pointing down at the cursor */
+.follower::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  bottom: -7px;
+  border-style: solid;
+  border-width: 7px 5px 0 1px;
+  border-color: var(--writer, #fff) transparent transparent transparent;
+}
+
+/* On the first line: the bubble hangs under the cursor, its tail pointing up */
+.below .follower {
+  bottom: auto;
+  top: calc(1.3em + 5px);
+  transform-origin: top left;
+}
+
+.below .follower::after {
+  bottom: auto;
+  top: -7px;
+  border-width: 0 5px 7px 1px;
+  border-color: transparent transparent var(--writer, #fff) transparent;
+}
+
+.below .idle::after {
+  border-bottom-color: color-mix(in srgb, var(--writer, #fff) 35%, transparent);
+}
+
+.idle {
+  border-color: color-mix(in srgb, var(--writer, #fff) 35%, transparent);
+}
+
+.idle::after {
+  border-top-color: color-mix(in srgb, var(--writer, #fff) 35%, transparent);
+}
+
+.busy {
+  animation: hop 0.35s ease-in-out infinite;
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+
+@keyframes hop {
+  50% {
+    transform: translateY(-3px) rotate(-5deg);
+  }
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marker::before,
+  .follower,
+  .busy,
+  .listening {
+    animation: none;
+  }
+}
+
+.drawRow {
+  display: flex;
+}
+
+.icon {
+  margin-right: 6px;
+  vertical-align: -2px;
+}

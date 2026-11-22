@@ -38,7 +38,14 @@ def test_the_list_shows_title_style_heroes_and_progress():
 
 @pytest.mark.parametrize(
     ("phase", "play", "progress"),
-    [("playing", {"scene": 3}, "Scene 3"), ("playing", None, "Playing"), ("ended", {"scene": 7}, "Finished")],
+    [
+        ("playing", {"scene": 3}, "Scene 3"),
+        ("playing", None, "Playing"),
+        ("ended", {"scene": 7}, "Finished"),
+        ("playing", {"act": 1, "actState": "writing", "story": []}, "Act 1 · Writing"),
+        ("playing", {"act": 4, "actState": "drawn"}, "Act 4 · Drawn"),
+        ("playing", {"act": 4, "actState": "lost"}, "Playing"),
+    ],
 )
 def test_progress_follows_the_phase(phase, play, progress):
     client.post("/api/saves", json=SAVE | {"phase": phase, "play": play})

@@ -6,7 +6,11 @@ A save is a JSON object in layers, so later parts of the game add to it without 
       "version": 2,
       "phase": "setup" | "playing" | "ended",
       "setup": {"title", "count", "party", "style", "gameId"},   # the party, saved on its last step
-      "play": null | {...}                                              # filled in once play is built
+      "play": null | {
+        "act": 2,                                    # the act being played, from 1
+        "actState": "writing" | "drawn",             # where that act stands
+        "story": [{"heroId", "text"}, ...],          # the shared story text, in pieces by who wrote them
+      }
     }
 
 Saves written before this layout (version 1: the setup fields at the top level) are upgraded when they are read,
@@ -31,6 +35,7 @@ router = APIRouter(prefix="/api/saves", tags=["saves"])
 VERSION = 2
 PHASES = ("setup", "playing", "ended")
 SETUP_KEYS = ("title", "count", "party", "style", "gameId")
+ACT_STATES = ("writing", "drawn")
 MAX_BYTES = 200_000  # Text only; a long story is still far below this
 
 SCHEMA = """
@@ -87,8 +92,12 @@ def progress(data: dict) -> str:
     if data["phase"] == "ended":
         return "Finished"
     if data["phase"] == "playing":
-        scene = (data.get("play") or {}).get("scene")
-        return f"Scene {scene}" if scene else "Playing"
+        play = data.get("play") or {}
+        if play.get("act") and play.get("actState") in ACT_STATES:
+            return f"Act {play['act']} · {play['actState'].capitalize()}"
+        if play.get("scene"):  # Saved before acts
+            return f"Scene {play['scene']}"
+        return "Playing"
     return "Set off"  # A setup is only saved on its last step
 
 

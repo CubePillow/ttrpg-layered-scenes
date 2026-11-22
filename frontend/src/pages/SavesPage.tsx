@@ -64,7 +64,7 @@ export default function SavesPage() {
               <li key={save.id} className={styles.save}>
                 <a
                   className={styles.card}
-                  href={`/party?save=${save.id}`}
+                  href={`${save.phase === 'setup' ? '/party' : '/story'}?save=${save.id}`}
                   aria-label={`Continue ${save.title || 'Untitled party'}`}
                 >
                   <span className={styles.main}>
