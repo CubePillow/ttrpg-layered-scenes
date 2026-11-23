@@ -21,6 +21,7 @@ export default function StoryPage() {
   const [save, setSave] = useState<Save | null>(null)
   const [missing, setMissing] = useState(false)
   const [pieces, setPieces] = useState<StoryPiece[]>([])
+  const [gmDirection, setGmDirection] = useState('')
   const [writer, setWriter] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<SaveState>('saved')
   const mirror = useRef<HTMLDivElement>(null)
@@ -57,12 +58,13 @@ export default function StoryPage() {
       if (!loaded) return setMissing(true)
       setSave(loaded)
       setPieces(loaded.play?.story ?? [])
+      setGmDirection(loaded.play?.gmDirection ?? '')
       setWriter(loaded.setup.party[0]?.id ?? null)
     })
   }, [])
 
   /** Saves a moment after the last change, so typing does not send a save per key. */
-  const keep = (next: StoryPiece[], delay = 600) => {
+  const keep = (next: StoryPiece[], delay = 600, direction = gmDirection) => {
     if (!save || !id.current) return
     setSaveState('saving')
     window.clearTimeout(timer.current)
@@ -72,7 +74,13 @@ export default function StoryPage() {
         await storeSave(saveTo, {
           ...save,
           phase: 'playing',
-          play: { ...save.play, act: save.play?.act ?? 1, actState: save.play?.actState ?? 'writing', story: next },
+          play: {
+            ...save.play,
+            act: save.play?.act ?? 1,
+            actState: save.play?.actState ?? 'writing',
+            gmDirection: direction,
+            story: next,
+          },
         })
         setSaveState('saved')
       } catch {
@@ -118,6 +126,7 @@ export default function StoryPage() {
   const text = storyText(pieces)
   const counts = wordsByHero(pieces)
   const totalWords = Object.values(counts).reduce((sum, n) => sum + n, 0)
+  const gmWordCount = gmDirection.trim() ? gmDirection.trim().split(/\s+/).length : 0
 
   /** The act being played; it moves on once drawing is built */
   const now: { number: number; state: ActState } = {
@@ -150,6 +159,29 @@ export default function StoryPage() {
         <span className={styles.actTag} data-state={now.state}>
           Act {now.number} · {now.state === 'drawn' ? 'Drawn' : 'Writing'}
         </span>
+      </div>
+      <div className={styles.direction}>
+        <label className={styles.directionLabel} htmlFor="gm-direction">
+          Gamemaster&apos;s direction
+        </label>
+        <p className={styles.directionHint}>Set a story beat or mood for the players to build on.</p>
+        <div className={styles.directionEditor}>
+          <textarea
+            id="gm-direction"
+            className={styles.directionField}
+            value={gmDirection}
+            placeholder="What should happen next?"
+            spellCheck={false}
+            onChange={(event) => {
+              const direction = event.target.value
+              setGmDirection(direction)
+              keep(pieces, 600, direction)
+            }}
+          />
+          <span className={styles.directionTotal}>
+            {gmWordCount} {gmWordCount === 1 ? 'word' : 'words'}
+          </span>
+        </div>
       </div>
       <div className={styles.toolbar} style={{ '--writer': writing?.color } as CSSProperties}>
         <span className={styles.label}>Writing as</span>

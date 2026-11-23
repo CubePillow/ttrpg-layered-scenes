@@ -29,6 +29,8 @@ export type PlaySave = {
   /** Kept for saves from before acts */
   scene?: number
   actState?: ActState
+  /** The gamemaster's direction for the players' story contributions */
+  gmDirection?: string
   story?: StoryPiece[]
 } & Record<string, unknown>
 
