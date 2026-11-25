@@ -322,6 +322,18 @@ export default function LayersPage() {
     remember()
     setLayers(next)
     setSaving('idle')
+    saveSoon()
+  }
+
+  /**
+   * Moves, resizes, order and hiding are kept a moment after the last change, so the save (and an act
+   * reopened from the story's history) always has the layers where they were left
+   */
+  const saveTimer = useRef<number | undefined>(undefined)
+  const keepRef = useRef<() => Promise<unknown>>(async () => null)
+  const saveSoon = () => {
+    window.clearTimeout(saveTimer.current)
+    saveTimer.current = window.setTimeout(() => void keepRef.current(), 800)
   }
 
   /** Changes one layer. A drag records one step when it starts, so its moves pass `record = false`. */
@@ -329,6 +341,7 @@ export default function LayersPage() {
     if (record) remember()
     setLayers((all) => all.map((l, i) => (i === index ? { ...l, ...box } : l)))
     setSaving('idle')
+    saveSoon()
   }
 
   /** Shows an earlier or later version of the layers */
@@ -435,6 +448,7 @@ export default function LayersPage() {
   useEffect(() => {
     undoRef.current = undo
     redoRef.current = redo
+    keepRef.current = () => keepAct()
   })
   useEffect(() => {
     const onKey = (event: globalThis.KeyboardEvent) => {
