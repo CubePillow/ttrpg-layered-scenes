@@ -14,6 +14,8 @@ const MAX_OBJECTS = 8
 const MIN_SIZE = 0.04
 
 const saveId = () => new URLSearchParams(window.location.search).get('save')
+/** `?act=2` opens an act already drawn, to look at its layers and move them again */
+const actParam = () => Number(new URLSearchParams(window.location.search).get('act')) || null
 
 /** A layer on the stage. Place and size are shares of the picture (0 to 1), so they hold at any stage size. */
 type StageLayer = {
@@ -30,6 +32,11 @@ type StageLayer = {
   hidden: boolean
   /** The repaint instructions this layer went through, oldest first; they also go into the act's prompt */
   edits?: string[]
+  /**
+   * On the background only, which is never deleted: the names of the layers deleted from this act.
+   * Kept here so Undo and Redo bring them back with the layers.
+   */
+  removed?: string[]
   /** Where the split put it, for Reset */
   start: { x: number; y: number; w: number; h: number }
 }
@@ -98,6 +105,7 @@ const moved = (l: StageLayer) => ({
   scale: l.w / l.start.w,
   hidden: l.hidden,
   edits: l.edits ?? [],
+  removed: l.removed,
 })
 
 /** A layer made ready again, put back where it was moved to, with its repaints */
@@ -109,11 +117,20 @@ const placeAgain = (l: StageLayer, m: ReturnType<typeof moved>): StageLayer => (
   h: l.h * m.scale,
   hidden: m.hidden,
   edits: m.edits,
+  removed: m.removed,
 })
 
-/** The repaints as lines added to the act's text: " tree: autumn leaves." */
-const repaintLines = (layers: { name: string; edits?: string[] }[]) =>
-  layers.flatMap((l) => (l.edits ?? []).map((e) => ` ${l.name}: ${e}.`)).join('')
+/** The repaints and deletions, as short notes: "tree: autumn leaves", "cat: removed" */
+const changeNotes = (layers: { name: string; edits?: string[]; removed?: string[] }[]) => [
+  ...layers.flatMap((l) => (l.edits ?? []).map((e) => `${l.name}: ${e}`)),
+  ...layers.flatMap((l) => (l.removed ?? []).map((name) => `${name}: removed`)),
+]
+
+/** The repaints and deletions as lines added to the act's text: " tree: autumn leaves. cat: removed." */
+const repaintLines = (layers: { name: string; edits?: string[]; removed?: string[] }[]) =>
+  changeNotes(layers)
+    .map((note) => ` ${note}.`)
+    .join('')
 
 /**
  * The story with this act's text ending in the current repaint lines instead of the ones saved before,
@@ -122,13 +139,20 @@ const repaintLines = (layers: { name: string; edits?: string[] }[]) =>
 function storyWithRepaints(story: StoryPiece[], start: number, before: string, after: string, writer: string) {
   const { earlier, current } = splitStory(story, start)
   let text = storyText(current)
-  if (before && text.endsWith(before)) text = text.slice(0, -before.length)
-  return [...earlier, ...editStory(current, text + after, writer)]
+  // The notes may have been written without their first space, after text that already ended in one
+  for (const old of [before, before.trimStart()]) {
+    if (old && text.endsWith(old)) {
+      text = text.slice(0, -old.length)
+      break
+    }
+  }
+  const lines = /\s$/.test(text) ? after.trimStart() : after
+  return [...earlier, ...editStory(current, text + lines, writer)]
 }
 
 /** The act's prompt with the repaints added, each once: "…, tree: autumn leaves" */
 function promptWithEdits(base: string, layers: StageLayer[]) {
-  const added = layers.flatMap((l) => (l.edits ?? []).map((e) => `${l.name}: ${e}`)).filter((e) => !base.includes(e))
+  const added = changeNotes(layers).filter((e) => !base.includes(e))
   return [base, ...added].join(', ')
 }
 
@@ -138,12 +162,15 @@ function promptWithEdits(base: string, layers: StageLayer[]) {
  */
 export default function LayersPage() {
   const id = saveId()
+  const openAct = actParam()
   /** The picture to split: the one just picked on the drawing page, or the act's kept picture */
   const [picked, setPicked] = useState<(PickedPicture & { pictureId?: string }) | null>(() =>
-    id ? loadPicked(id) : null,
+    id && !openAct ? loadPicked(id) : null,
   )
   const [save, setSave] = useState<Save | null>(null)
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle')
+  /** An act drawn earlier can only be arranged again: its layers move and resize, nothing is redrawn or removed */
+  const arrangeOnly = openAct !== null && save !== null && openAct < (save.play?.act ?? 1)
   /** The objects to cut out, comma separated, back to front, as in the prototype */
   const [namesText, setNamesText] = useState('')
   const names = [
@@ -175,8 +202,8 @@ export default function LayersPage() {
       setSave(loaded)
       if (!loaded) return
       // Open the act as it was kept, unless another picture has been picked since
-      const kept = loaded.play?.acts?.find((a) => a.number === (loaded.play?.act ?? 1))
-      const fresh = loadPicked(id)
+      const kept = loaded.play?.acts?.find((a) => a.number === (openAct ?? loaded.play?.act ?? 1))
+      const fresh = openAct ? null : loadPicked(id)
       if (!kept || (fresh && fresh.seed !== kept.seed)) return
       try {
         const image = await pictureData(kept.pictureId)
@@ -185,7 +212,7 @@ export default function LayersPage() {
         )
         const restored = (await stageLayers(parts, loaded.setup.style === 'pixel')).map((l, i) => {
           const m = kept.layers[i]
-          return placeAgain(l, { ...m, edits: m.edits ?? [] })
+          return placeAgain(l, { ...m, edits: m.edits ?? [], removed: m.removed })
         })
         setPicked({ image, prompt: kept.prompt, seed: kept.seed, pictureId: kept.pictureId })
         setLayers(restored)
@@ -194,10 +221,11 @@ export default function LayersPage() {
         setError((failure as Error).message)
       }
     })
-  }, [id])
+  }, [id, openAct])
 
   const pixelStyle = save?.setup.style === 'pixel'
   const drawLink = id ? `/draw?save=${encodeURIComponent(id)}` : '/saves'
+  const storyLink = id ? `/story?save=${encodeURIComponent(id)}` : '/saves'
 
   /**
    * Keeps the act: the picked picture and every layer go to the backend once (only their ids go in the save),
@@ -214,16 +242,19 @@ export default function LayersPage() {
       // Remember which pictures are kept, so they are not sent again
       const kept = new Map(current.map((l, i) => [l.source, ids[i]]))
       setLayers((all) => all.map((l) => ({ ...l, sourceId: l.sourceId ?? kept.get(l.source) })))
-      const number = save.play?.act ?? 1
+      const number = openAct ?? save.play?.act ?? 1
+      // An earlier act keeps its text and the act being written stays the current one
+      const past = number < (save.play?.act ?? 1)
       const start = actStart(save.play, number)
       const before = repaintLines(save.play?.acts?.find((a) => a.number === number)?.layers ?? [])
       const oldStory = save.play?.story ?? []
       const writer = splitStory(oldStory, start).current.at(-1)?.heroId ?? save.setup.party[0]?.id ?? ''
-      const story = storyWithRepaints(oldStory, start, before, repaintLines(current), writer)
+      const story = past ? oldStory : storyWithRepaints(oldStory, start, before, repaintLines(current), writer)
+      const earlier = save.play?.acts?.find((a) => a.number === number)
       const act: ActSave = {
         number,
-        from: start,
-        to: storyText(story).length,
+        from: past && earlier ? earlier.from : start,
+        to: past && earlier ? earlier.to : storyText(story).length,
         // A prompt changed on the drawing page since the picture was picked wins
         // and the repaints are added, so Undo of a repaint takes its words out again
         prompt: promptWithEdits(save.play?.draft?.act === number ? save.play.draft.prompt : picked.prompt, current),
@@ -238,8 +269,8 @@ export default function LayersPage() {
         play: {
           ...play,
           story,
-          act: number,
-          actState: 'drawn',
+          act: past ? play.act : number,
+          actState: past ? play.actState : 'drawn',
           acts: [...(play.acts ?? []).filter((a) => a.number !== number), act],
         },
       }
@@ -375,8 +406,12 @@ export default function LayersPage() {
   /** Deletes an object layer; the background always stays */
   const remove = (index: number) => {
     if (index === 0) return
-    const next = layers.filter((_, i) => i !== index)
+    // The background remembers the deleted layer, so the act's text and prompt can say it is gone
+    const next = layers
+      .filter((_, i) => i !== index)
+      .map((l, i) => (i === 0 ? { ...l, removed: [...(l.removed ?? []), layers[index].name] } : l))
     commit(next)
+    void keepAct(next) // Kept at once, like a repaint, so the text and prompt follow
     // Keep a layer selected, so the side panel stays; the note says how to get the deleted one back
     setSelected(next.length > 1 ? Math.min(index, next.length - 1) : null)
     setNotice(`Deleted ${layers[index].name}. Undo brings it back.`)
@@ -499,7 +534,10 @@ export default function LayersPage() {
         <Panel className={styles.panel}>
           <header className={styles.header}>
             <div>
-              <Eyebrow>Act {roman(save?.play?.act ?? 1)}</Eyebrow>
+              <Eyebrow>
+                Act {roman(openAct ?? save?.play?.act ?? 1)}
+                {openAct && openAct < (save?.play?.act ?? 1) ? ' · drawn earlier' : ''}
+              </Eyebrow>
               <SectionTitle className={styles.title}>{save?.setup.title ?? 'Layers'}</SectionTitle>
             </div>
           </header>
@@ -555,7 +593,10 @@ export default function LayersPage() {
             <>
               <div className={styles.toolbar}>
                 <span className={notice ? styles.notice : styles.hint} role="status">
-                  {notice ?? 'Drag to move · drag the corner to resize · arrow keys nudge'}
+                  {notice ??
+                    (arrangeOnly
+                      ? 'This act is drawn: its layers can be moved, resized, reordered and hidden'
+                      : 'Drag to move · drag the corner to resize · arrow keys nudge')}
                 </span>
                 <div className={styles.tools}>
                   <Button onClick={undo} disabled={undoCount === 0} title="Undo (Ctrl+Z)">
@@ -567,7 +608,7 @@ export default function LayersPage() {
                   <Button onClick={() => commit(layers.map((l) => ({ ...l, ...l.start, hidden: false })))}>
                     Reset
                   </Button>
-                  <Button onClick={splitAgain}>Split again</Button>
+                  {!arrangeOnly && <Button onClick={splitAgain}>Split again</Button>}
                 </div>
               </div>
               <div className={styles.editor}>
@@ -655,7 +696,7 @@ export default function LayersPage() {
                           >
                             <EyeIcon open={!l.hidden} />
                           </button>
-                          {i > 0 && (
+                          {i > 0 && !arrangeOnly && (
                             <button
                               type="button"
                               className={`${styles.eye} ${styles.bin}`}
@@ -670,7 +711,7 @@ export default function LayersPage() {
                       </li>
                     ))}
                   </ol>
-                  {selected !== null && layers[selected] && (
+                  {!arrangeOnly && selected !== null && layers[selected] && (
                     <form
                       className={styles.editBox}
                       onSubmit={(event) => {
@@ -707,10 +748,21 @@ export default function LayersPage() {
                 </div>
               </div>
               <footer className={styles.footer}>
-                <Button href={drawLink}>Back</Button>
-                <Button variant="primary" onClick={nextAct} disabled={saving === 'saving'}>
-                  {saving === 'saving' ? 'Saving…' : `Write act ${(save?.play?.act ?? 1) + 1} →`}
-                </Button>
+                {openAct && openAct < (save?.play?.act ?? 1) ? (
+                  <>
+                    <Button href={storyLink}>Back</Button>
+                    <Button variant="primary" href={storyLink}>
+                      Back to the story →
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button href={drawLink}>Back</Button>
+                    <Button variant="primary" onClick={nextAct} disabled={saving === 'saving'}>
+                      {saving === 'saving' ? 'Saving…' : `Write act ${(save?.play?.act ?? 1) + 1} →`}
+                    </Button>
+                  </>
+                )}
               </footer>
             </>
           )}
