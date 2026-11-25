@@ -30,7 +30,7 @@
 }
 
 .panel {
-  width: min(100%, 760px);
+  width: min(100%, 800px);
   display: grid;
   gap: 14px;
   padding: clamp(14px, 2.5vw, 22px);
@@ -38,9 +38,18 @@
 
 .topBar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 12px 20px;
+  width: min(100%, 800px);
+}
+
+.topActions {
+  display: flex;
+  flex: none;
   gap: 0.5rem;
-  width: min(100%, 760px);
+  margin-left: auto;
 }
 
 .titleRow {
@@ -218,7 +227,9 @@
   margin: 0;
   padding: 18px 22px;
   border: 0;
-  font: 1.05rem/1.8 system-ui, sans-serif;
+  font:
+    1.05rem/1.8 system-ui,
+    sans-serif;
   letter-spacing: normal;
   white-space: pre-wrap;
   overflow-wrap: break-word;
@@ -357,9 +368,22 @@
 
 .drawRow {
   display: flex;
+  gap: 10px;
 }
 
 .icon {
   margin-right: 6px;
   vertical-align: -2px;
+}
+
+/* On a phone the buttons need the whole line */
+@media (max-width: 560px) {
+  .topBar {
+    flex-wrap: wrap;
+  }
+}
+
+/* Text of acts already drawn: it can be read but not changed */
+.locked {
+  opacity: 0.5;
 }

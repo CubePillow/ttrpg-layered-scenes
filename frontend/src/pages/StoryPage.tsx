@@ -1,10 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import HeroPortrait from '../components/party/HeroPortrait'
 import PixelScene from '../components/pixel-scene/PixelScene'
-import { Badge, Button, Panel, SectionTitle } from '../components/ui'
+import { ActSteps, Button, MusicToggle, Panel, SectionTitle } from '../components/ui'
 import { canDictate, useDictation } from '../audio/useDictation'
 import VoiceMeter from '../components/ui/VoiceMeter'
-import { loadSave, storeSave, type Save, type ActState } from '../data/saves'
+import { actStart, loadSave, storeSave, type Save, type ActState } from '../data/saves'
 import { editStory, storyText, wordsByHero, type StoryPiece } from '../data/story'
 import styles from './StoryPage.module.css'
 
@@ -81,8 +81,20 @@ export default function StoryPage() {
     }, delay)
   }
 
+  /** Text of the acts already drawn is locked, so each act keeps the words its picture was made from */
+  const [lockNote, setLockNote] = useState(false)
+  const lockTimer = useRef<number | undefined>(undefined)
+
   const type = (text: string) => {
-    if (!writer) return
+    if (!writer || !save) return
+    const old = storyText(pieces)
+    const locked = Math.min(actStart(save.play, save.play?.act ?? 1), old.length)
+    if (text.slice(0, locked) !== old.slice(0, locked)) {
+      setLockNote(true)
+      window.clearTimeout(lockTimer.current)
+      lockTimer.current = window.setTimeout(() => setLockNote(false), 2500)
+      return
+    }
     const next = editStory(pieces, text, writer)
     setPieces(next)
     keep(next)
@@ -124,13 +136,43 @@ export default function StoryPage() {
     number: save.play?.act ?? 1,
     state: save.play?.actState ?? 'writing',
   }
-  /** Draws pieces in their writers' colours */
-  const paint = (list: StoryPiece[], key: string) =>
-    list.map((piece, i) => (
-      <span key={`${key}${i}`} style={{ color: color(piece.heroId) }}>
-        {piece.text}
-      </span>
-    ))
+  /** Where this act's text starts: everything before it belongs to acts already drawn */
+  const lockedTo = Math.min(actStart(save.play, now.number), text.length)
+  const actText = text.slice(lockedTo)
+
+  /** Draws pieces (starting at `offset` in the text) in their writers' colours; drawn acts' text is dimmer */
+  const paint = (list: StoryPiece[], offset: number, key: string) => {
+    const { before, after } = piecesAround(list, lockedTo - offset)
+    return [
+      ...before.map((piece, i) => (
+        <span key={`${key}l${i}`} className={styles.locked} style={{ color: color(piece.heroId) }}>
+          {piece.text}
+        </span>
+      )),
+      ...after.map((piece, i) => (
+        <span key={`${key}${i}`} style={{ color: color(piece.heroId) }}>
+          {piece.text}
+        </span>
+      )),
+    ]
+  }
+
+  /** Saves what is written right away, then opens the drawing page */
+  const openDraw = async () => {
+    if (!id.current) return
+    window.clearTimeout(timer.current)
+    setSaveState('saving')
+    try {
+      await storeSave(id.current, {
+        ...save,
+        phase: 'playing',
+        play: { ...save.play, act: save.play?.act ?? 1, actState: save.play?.actState ?? 'writing', story: pieces },
+      })
+    } catch {
+      return setSaveState('failed')
+    }
+    window.location.href = `/draw?save=${encodeURIComponent(id.current)}`
+  }
 
   const writing = party.find((h) => h.id === writer)
 
@@ -194,11 +236,13 @@ export default function StoryPage() {
         )}
       </div>
       {/* Shown only when something is going on; the field's placeholder already says how to write */}
-      {(dictation.error || dictation.listening) && (
+      {(lockNote || dictation.error || dictation.listening) && (
         <p className={dictation.listening ? `${styles.hint} ${styles.listening}` : styles.hint} role="status">
-          {dictation.error
-            ? `${dictation.error}. You can still type in the box.`
-            : dictation.heard || `Listening to ${writing?.name ?? 'you'}… speak now, then press ■ to finish.`}
+          {lockNote
+            ? `Acts already drawn are locked. Write act ${now.number} after them.`
+            : dictation.error
+              ? `${dictation.error}. You can still type in the box.`
+              : dictation.heard || `Listening to ${writing?.name ?? 'you'}… speak now, then press ■ to finish.`}
         </p>
       )}
       <div
@@ -206,7 +250,7 @@ export default function StoryPage() {
         style={{ '--writer': writing?.color } as CSSProperties}
       >
         <div ref={mirror} className={styles.mirror} aria-hidden="true">
-          {paint(piecesAround(pieces, caret).before, 'b')}
+          {paint(piecesAround(pieces, caret).before, 0, 'b')}
           {showCursor && writing && (
             <span ref={marker} className={below ? `${styles.marker} ${styles.below}` : styles.marker}>
               <span
@@ -223,7 +267,7 @@ export default function StoryPage() {
               </span>
             </span>
           )}
-          {paint(piecesAround(pieces, caret).after, 'a')}
+          {paint(piecesAround(pieces, caret).after, caret, 'a')}
           {/* Keeps a last empty line the same height as in the field */}
           {'​'}
         </div>
@@ -256,9 +300,14 @@ export default function StoryPage() {
         />
       </div>
       <div className={styles.drawRow}>
-        <Button variant="primary" disabled>
+        <Button
+          variant="primary"
+          disabled={!actText.trim() || saveState === 'saving'}
+          title={actText.trim() ? undefined : `Write act ${now.number} first`}
+          onClick={openDraw}
+        >
           <BrushIcon />
-          Draw this scene <Badge>coming soon</Badge>
+          Draw this scene
         </Button>
       </div>
     </Frame>
@@ -309,8 +358,12 @@ function Frame({ actions, children }: { actions?: ReactNode; children: ReactNode
       <div className={styles.shade} />
       <main className={styles.content}>
         <div className={styles.topBar}>
-          <Button href="/">Home</Button>
-          {actions}
+          <ActSteps current={0} />
+          <div className={styles.topActions}>
+            <Button href="/">Home</Button>
+            <MusicToggle />
+            {actions}
+          </div>
         </div>
         <Panel className={styles.panel}>{children}</Panel>
       </main>
