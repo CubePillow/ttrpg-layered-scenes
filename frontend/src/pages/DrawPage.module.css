@@ -1,0 +1,298 @@
+.page {
+  position: relative;
+  min-height: 100svh;
+}
+
+.scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 67% 100%;
+  image-rendering: pixelated;
+}
+
+.shade {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 6, 12, 0.55);
+}
+
+.content {
+  position: relative;
+  min-height: 100svh;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 14px;
+  padding: 28px clamp(12px, 4vw, 48px);
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 12px 20px;
+  width: min(100%, 820px);
+}
+
+.topActions {
+  display: flex;
+  flex: none;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.panel {
+  width: min(100%, 820px);
+  display: grid;
+  gap: 16px;
+  padding: clamp(14px, 2.5vw, 22px);
+}
+
+.title {
+  margin: 0;
+}
+
+/* Title on the left, the act's steps on the right */
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px 20px;
+}
+
+/* The prompt, written on a parchment scroll */
+.scroll {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px 12px;
+  border: 3px solid #6b4a24;
+  background: #ead8a8;
+  box-shadow:
+    inset 0 0 0 2px #f6e9c4,
+    inset 0 -6px 0 rgba(107, 74, 36, 0.18),
+    0 4px 0 #2a1a0b;
+  color: #3a2410;
+}
+
+.label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-family: var(--pixel);
+  font-size: 0.7rem;
+  color: #5a3714;
+}
+
+.label small {
+  font-family: var(--body);
+  font-size: 0.75rem;
+  opacity: 0.65;
+}
+
+.prompt {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px dashed rgba(90, 55, 20, 0.45);
+  background: rgba(255, 248, 226, 0.55);
+  color: #2b1a0a;
+  font: 1rem/1.6 var(--body);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.prompt:focus {
+  outline: none;
+  border-style: solid;
+  border-color: #8a5a22;
+}
+
+.promptFoot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 12px;
+  font-size: 0.75rem;
+  color: #6b4a24;
+}
+
+.tooLong {
+  color: #a3261b;
+  font-weight: bold;
+}
+
+.reset {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.how {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #6b4a24;
+  opacity: 0.8;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.error {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 4px solid #e05252;
+  background: rgba(224, 82, 82, 0.12);
+}
+
+.choose {
+  margin: 4px 0 -4px;
+  font-family: var(--pixel);
+  font-size: 0.7rem;
+  color: var(--accent-hot);
+  text-align: center;
+}
+
+/* Three versions as framed cards, like cards laid on the table */
+.candidates {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.figure {
+  position: relative;
+  margin: 0;
+  padding-top: 12px;
+}
+
+.figure figcaption {
+  margin-top: 6px;
+  font-size: 0.7rem;
+  text-align: center;
+  opacity: 0.55;
+}
+
+/* The card's number, on a little banner over its top edge */
+.banner {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 1;
+  transform: translateX(-50%);
+  min-width: 38px;
+  padding: 3px 10px;
+  border: 2px solid var(--ink);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: var(--pixel);
+  font-size: 0.65rem;
+  text-align: center;
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+.candidate,
+.waiting {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 6px;
+  border: 3px solid #6b4a24;
+  background: #2a1a0b;
+  box-shadow:
+    inset 0 0 0 2px #c79a4a,
+    0 5px 0 var(--ink);
+  box-sizing: border-box;
+}
+
+.candidate {
+  cursor: pointer;
+  transition:
+    transform 0.12s steps(3),
+    box-shadow 0.12s steps(3);
+}
+
+.candidate:hover:not(:disabled),
+.candidate:focus-visible {
+  transform: translateY(-4px);
+  box-shadow:
+    inset 0 0 0 2px var(--accent-hot),
+    0 9px 0 var(--ink),
+    0 0 0 3px var(--accent);
+  outline: none;
+}
+
+.candidate img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.candidate img.pixel {
+  image-rendering: pixelated;
+}
+
+.waiting {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+/* A die tumbling while the picture is drawn */
+.die,
+.rolling {
+  display: inline-block;
+  animation: roll 0.9s steps(4) infinite;
+}
+
+.die {
+  font-size: 1.8rem;
+}
+
+@keyframes roll {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (max-width: 560px) {
+  .candidates {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .die,
+  .rolling,
+  .candidate {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* On a phone the buttons need the whole line */
+@media (max-width: 560px) {
+  .topBar {
+    flex-wrap: wrap;
+  }
+}
