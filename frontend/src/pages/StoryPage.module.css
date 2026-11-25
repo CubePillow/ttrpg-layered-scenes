@@ -419,3 +419,15 @@
   white-space: pre-wrap;
   opacity: 0.7;
 }
+
+/* Opens an earlier act's picture, to look at its layers and move them */
+.openAct {
+  margin-left: 10px;
+  font-family: var(--body);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.openAct:hover {
+  color: var(--accent-hot);
+}

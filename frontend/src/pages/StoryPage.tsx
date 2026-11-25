@@ -187,7 +187,15 @@ export default function StoryPage() {
           <div className={styles.historyActs}>
             {history.map((a) => (
               <section key={a.number} className={styles.historyAct}>
-                <h3>Act {roman(a.number)}</h3>
+                <h3>
+                  Act {roman(a.number)}
+                  <a
+                    className={styles.openAct}
+                    href={`/layers?save=${encodeURIComponent(saveId() ?? '')}&act=${a.number}`}
+                  >
+                    🖼 Layers
+                  </a>
+                </h3>
                 <p>{paint(a.pieces, `h${a.number}-`)}</p>
               </section>
             ))}
