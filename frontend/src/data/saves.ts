@@ -19,7 +19,27 @@ export type SetupSave = {
   gameId: string | null
 }
 
-/** Play: the shared story text and the act being played. */
+/** Play: the shared story text, the act being played, and the acts drawn so far. */
+
+/** One split layer of a drawn act: how far it was moved (shares of the picture) and resized from where it was cut. */
+export type LayerSave = { name: string; pictureId: string; dx: number; dy: number; scale: number; hidden: boolean }
+
+/** A drawn act. Pictures are kept on the backend and held here by id; the pixel look is made again when shown. */
+export type ActSave = {
+  number: number
+  /** The act's part of the story text, as character positions */
+  from: number
+  to: number
+  prompt: string
+  seed: number
+  pictureId: string
+  layers: LayerSave[]
+}
+
+/** Where an act's text starts: right after the text of the acts before it. */
+export const actStart = (play: PlaySave | null | undefined, number: number) =>
+  Math.max(0, ...(play?.acts ?? []).filter((a) => a.number < number).map((a) => a.to ?? 0))
+
 /** Where the act being played stands: still being written, or drawn */
 export type ActState = 'writing' | 'drawn'
 
@@ -30,6 +50,7 @@ export type PlaySave = {
   scene?: number
   actState?: ActState
   story?: StoryPiece[]
+  acts?: ActSave[]
 } & Record<string, unknown>
 
 export type Save = {
