@@ -10,10 +10,11 @@ A save is a JSON object in layers, so later parts of the game add to it without 
         "act": 2,                                    # the act being played, from 1
         "actState": "writing" | "drawn",             # where that act stands
         "story": [{"heroId", "text"}, ...],          # the shared story text, in pieces by who wrote them
+        "draft": {"act", "prompt"},                  # the picture prompt as last written on the drawing page
         "acts": [{                                   # drawn acts; pictures are kept apart (pictures.py), by id
           "number", "from", "to",                    # the act's part of the story text
           "number", "prompt", "seed", "pictureId",   # the picked picture, as the model drew it
-          "layers": [{"name", "pictureId", "dx", "dy", "scale", "hidden"}, ...]  # split layers, back to front,
+          "layers": [{"name", "pictureId", "dx", "dy", "scale", "hidden", "edits"}, ...]  # split layers, back to front,
         }, ...]                                      #   and how far each was moved and resized from where it was cut
       }
     }

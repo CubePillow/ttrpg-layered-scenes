@@ -22,7 +22,16 @@ export type SetupSave = {
 /** Play: the shared story text, the act being played, and the acts drawn so far. */
 
 /** One split layer of a drawn act: how far it was moved (shares of the picture) and resized from where it was cut. */
-export type LayerSave = { name: string; pictureId: string; dx: number; dy: number; scale: number; hidden: boolean }
+export type LayerSave = {
+  name: string
+  pictureId: string
+  dx: number
+  dy: number
+  scale: number
+  hidden: boolean
+  /** The repaint instructions this layer went through, oldest first */
+  edits?: string[]
+}
 
 /** A drawn act. Pictures are kept on the backend and held here by id; the pixel look is made again when shown. */
 export type ActSave = {
@@ -51,6 +60,8 @@ export type PlaySave = {
   actState?: ActState
   story?: StoryPiece[]
   acts?: ActSave[]
+  /** The picture prompt as last written on the drawing page, for the act being played */
+  draft?: { act: number; prompt: string }
 } & Record<string, unknown>
 
 export type Save = {
