@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import PixelScene from '../components/pixel-scene/PixelScene'
 import { ActSteps, Button, Eyebrow, MusicToggle, Panel, SectionTitle } from '../components/ui'
 import { roman } from '../data/roman'
 import { generateImage, pixelize, randomSeed } from '../api/images'
-import { actStart, loadSave, type Save } from '../data/saves'
+import { actStart, loadSave, storeSave, type Save } from '../data/saves'
 import { keepPicked } from '../data/picked'
-import { scenePrompt } from '../data/scenePrompt'
+import { BASE_LOOK, promptFor } from '../data/scenePrompt'
+import { editStory, splitStory, storyText } from '../data/story'
 import styles from './DrawPage.module.css'
 
 const CANDIDATES = 3
@@ -26,26 +27,60 @@ export default function DrawPage() {
   const id = saveId()
   const [save, setSave] = useState<Save | null>(null)
   const [missing, setMissing] = useState(!id)
-  const [prompt, setPrompt] = useState('')
+  /** The act's own text: the same words as on the story page, so a change here changes the story too */
+  const [actText, setActText] = useState('')
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [drawing, setDrawing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const pixelStyle = save?.setup.style === 'pixel'
-  const built = save ? scenePrompt(save.play?.story ?? [], actStart(save.play, save.play?.act ?? 1)) : ''
+  const act = save?.play?.act ?? 1
+  const start = save ? actStart(save.play, act) : 0
+  /** Repaints already made on this act's layers; they stay in the prompt */
+  const extras =
+    save?.play?.acts
+      ?.find((a) => a.number === act)
+      ?.layers.flatMap((l) => (l.edits ?? []).map((e) => `${l.name}: ${e}`)) ?? []
+  const prompt = promptFor(actText, extras)
 
   useEffect(() => {
     if (!id) return
     loadSave(id).then((loaded) => {
       if (!loaded) return setMissing(true)
       setSave(loaded)
-      setPrompt(scenePrompt(loaded.play?.story ?? [], actStart(loaded.play, loaded.play?.act ?? 1)))
+      setActText(storyText(loaded.play?.story ?? []).slice(actStart(loaded.play, loaded.play?.act ?? 1)))
     })
   }, [id])
 
+  /** Writes the changed act text into the story a moment after the last change */
+  const keepTimer = useRef<number | undefined>(undefined)
+  const changeText = (text: string) => {
+    setActText(text)
+    if (!id || !save) return
+    window.clearTimeout(keepTimer.current)
+    keepTimer.current = window.setTimeout(() => {
+      const play = save.play ?? {}
+      const { earlier, current } = splitStory(play.story ?? [], start)
+      // New words count for whoever wrote last in this act
+      const writer = current.at(-1)?.heroId ?? save.setup.party[0]?.id ?? ''
+      const story = [...earlier, ...editStory(current, text, writer)]
+      const next: Save = {
+        ...save,
+        play: {
+          ...play,
+          story,
+          draft: undefined,
+          acts: play.acts?.map((a) => (a.number === act ? { ...a, to: storyText(story).length } : a)),
+        },
+      }
+      setSave(next)
+      storeSave(id, next).catch(() => setError('The text could not be kept. Is the backend running?'))
+    }, 600)
+  }
+
   const draw = async () => {
-    const text = prompt.trim()
-    if (!text || drawing) return
+    const text = prompt
+    if (!actText.trim() || drawing) return
     const first = randomSeed()
     setError(null)
     setDrawing(true)
@@ -69,7 +104,7 @@ export default function DrawPage() {
   /** Picking a version opens the layers page with it */
   const pick = (c: Candidate) => {
     if (!id || !c.image) return
-    if (!keepPicked(id, { image: c.image, pixel: c.pixel, prompt: prompt.trim(), seed: c.seed })) {
+    if (!keepPicked(id, { image: c.image, pixel: c.pixel, prompt, seed: c.seed })) {
       return setError('The picture could not be kept in this browser tab. Try again.')
     }
     window.location.assign(`/layers?save=${encodeURIComponent(id)}`)
@@ -108,36 +143,36 @@ export default function DrawPage() {
               </header>
 
               <div className={styles.scroll}>
-                <label htmlFor="prompt" className={styles.label}>
+                <span className={styles.label}>
                   ✦ What the painter will draw <small>prompt for SDXL-Turbo</small>
+                </span>
+                <p className={styles.fixed} title="The look every picture is drawn in; it splits cleanly into layers">
+                  <span aria-hidden="true">🔒</span> {BASE_LOOK}
+                </p>
+                <label htmlFor="act-text" className={styles.small}>
+                  Act {roman(act)}'s text. Changing it here changes the story too.
                 </label>
                 <textarea
-                  id="prompt"
+                  id="act-text"
                   className={styles.prompt}
-                  value={prompt}
+                  value={actText}
                   rows={4}
-                  maxLength={2000}
+                  maxLength={4000}
                   disabled={drawing}
-                  onChange={(e) => setPrompt(e.target.value)}
+                  onChange={(e) => changeText(e.target.value)}
                 />
+                {extras.length > 0 && <p className={styles.small}>Repaints, added at the end: {extras.join(', ')}</p>}
                 <div className={styles.promptFoot}>
                   <span className={words > PROMPT_WORDS ? styles.tooLong : undefined}>
-                    {words} words{words > PROMPT_WORDS && ` · the model only reads about the first ${PROMPT_WORDS}`}
+                    {words} words in all
+                    {words > PROMPT_WORDS && ` · the model only reads about the first ${PROMPT_WORDS}`}
                   </span>
-                  {prompt !== built && (
-                    <button type="button" className={styles.reset} disabled={drawing} onClick={() => setPrompt(built)}>
-                      Back to the prompt from the story
-                    </button>
-                  )}
                 </div>
-                <p className={styles.how}>
-                  Made from: a flat vector look (simple shapes, large colour blocks, few details) and the last 40 words of this act's text.
-                </p>
               </div>
 
               <div className={styles.actions}>
                 <Button href={storyLink}>Back</Button>
-                <Button variant="primary" disabled={!prompt.trim() || drawing} onClick={draw}>
+                <Button variant="primary" disabled={!actText.trim() || drawing} onClick={draw}>
                   <span className={drawing ? styles.rolling : undefined} aria-hidden="true">
                     🎲
                   </span>{' '}

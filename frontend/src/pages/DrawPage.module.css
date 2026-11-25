@@ -296,3 +296,19 @@
     flex-wrap: wrap;
   }
 }
+
+/* The look, the same for every picture: shown, not changed */
+.fixed {
+  margin: 0;
+  padding: 6px 10px;
+  border: 2px solid rgba(90, 55, 20, 0.35);
+  background: rgba(107, 74, 36, 0.12);
+  color: #6b4a24;
+  font-size: 0.85rem;
+}
+
+.small {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #6b4a24;
+}
