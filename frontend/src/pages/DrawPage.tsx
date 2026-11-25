@@ -40,7 +40,10 @@ export default function DrawPage() {
   const extras =
     save?.play?.acts
       ?.find((a) => a.number === act)
-      ?.layers.flatMap((l) => (l.edits ?? []).map((e) => `${l.name}: ${e}`)) ?? []
+      ?.layers.flatMap((l) => [
+        ...(l.edits ?? []).map((e) => `${l.name}: ${e}`),
+        ...(l.removed ?? []).map((name) => `${name}: removed`),
+      ]) ?? []
   const prompt = promptFor(actText, extras)
 
   useEffect(() => {

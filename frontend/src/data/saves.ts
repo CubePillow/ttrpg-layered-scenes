@@ -31,6 +31,8 @@ export type LayerSave = {
   hidden: boolean
   /** The repaint instructions this layer went through, oldest first */
   edits?: string[]
+  /** On the background only: the layers deleted from this act, which the act's text and prompt mention as removed */
+  removed?: string[]
 }
 
 /** A drawn act. Pictures are kept on the backend and held here by id; the pixel look is made again when shown. */
