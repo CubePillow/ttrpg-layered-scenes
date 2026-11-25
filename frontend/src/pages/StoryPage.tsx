@@ -5,7 +5,8 @@ import { ActSteps, Button, MusicToggle, Panel, SectionTitle } from '../component
 import { canDictate, useDictation } from '../audio/useDictation'
 import VoiceMeter from '../components/ui/VoiceMeter'
 import { actStart, loadSave, storeSave, type Save, type ActState } from '../data/saves'
-import { editStory, storyText, wordsByHero, type StoryPiece } from '../data/story'
+import { editStory, splitStory, storyText, wordsByHero, type StoryPiece } from '../data/story'
+import { roman } from '../data/roman'
 import styles from './StoryPage.module.css'
 
 type SaveState = 'saved' | 'saving' | 'failed'
@@ -20,9 +21,12 @@ export default function StoryPage() {
   const id = useRef(saveId())
   const [save, setSave] = useState<Save | null>(null)
   const [missing, setMissing] = useState(false)
-  const [pieces, setPieces] = useState<StoryPiece[]>([])
+  /** The whole story, every act */
+  const [story, setStory] = useState<StoryPiece[]>([])
   const [writer, setWriter] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<SaveState>('saved')
+  /** The box holds only the act being written; earlier acts are shown apart, under "Story so far" */
+  const { earlier, current: pieces } = splitStory(story, actStart(save?.play, save?.play?.act ?? 1))
   const mirror = useRef<HTMLDivElement>(null)
   const field = useRef<HTMLTextAreaElement>(null)
   /** Where the cursor is, so the writer's portrait can follow it */
@@ -56,7 +60,7 @@ export default function StoryPage() {
     loadSave(id.current).then((loaded) => {
       if (!loaded) return setMissing(true)
       setSave(loaded)
-      setPieces(loaded.play?.story ?? [])
+      setStory(loaded.play?.story ?? [])
       setWriter(loaded.setup.party[0]?.id ?? null)
     })
   }, [])
@@ -81,22 +85,10 @@ export default function StoryPage() {
     }, delay)
   }
 
-  /** Text of the acts already drawn is locked, so each act keeps the words its picture was made from */
-  const [lockNote, setLockNote] = useState(false)
-  const lockTimer = useRef<number | undefined>(undefined)
-
   const type = (text: string) => {
-    if (!writer || !save) return
-    const old = storyText(pieces)
-    const locked = Math.min(actStart(save.play, save.play?.act ?? 1), old.length)
-    if (text.slice(0, locked) !== old.slice(0, locked)) {
-      setLockNote(true)
-      window.clearTimeout(lockTimer.current)
-      lockTimer.current = window.setTimeout(() => setLockNote(false), 2500)
-      return
-    }
-    const next = editStory(pieces, text, writer)
-    setPieces(next)
+    if (!writer) return
+    const next = [...earlier, ...editStory(pieces, text, writer)]
+    setStory(next)
     keep(next)
     setTyping(true)
     window.clearTimeout(typingTimer.current)
@@ -136,26 +128,20 @@ export default function StoryPage() {
     number: save.play?.act ?? 1,
     state: save.play?.actState ?? 'writing',
   }
-  /** Where this act's text starts: everything before it belongs to acts already drawn */
-  const lockedTo = Math.min(actStart(save.play, now.number), text.length)
-  const actText = text.slice(lockedTo)
 
-  /** Draws pieces (starting at `offset` in the text) in their writers' colours; drawn acts' text is dimmer */
-  const paint = (list: StoryPiece[], offset: number, key: string) => {
-    const { before, after } = piecesAround(list, lockedTo - offset)
-    return [
-      ...before.map((piece, i) => (
-        <span key={`${key}l${i}`} className={styles.locked} style={{ color: color(piece.heroId) }}>
-          {piece.text}
-        </span>
-      )),
-      ...after.map((piece, i) => (
-        <span key={`${key}${i}`} style={{ color: color(piece.heroId) }}>
-          {piece.text}
-        </span>
-      )),
-    ]
-  }
+  /** Draws pieces in their writers' colours */
+  const paint = (list: StoryPiece[], key: string) =>
+    list.map((piece, i) => (
+      <span key={`${key}${i}`} style={{ color: color(piece.heroId) }}>
+        {piece.text}
+      </span>
+    ))
+
+  /** The acts already drawn, each with its own part of the story, oldest first */
+  const history = (save.play?.acts ?? [])
+    .filter((a) => a.number < now.number)
+    .sort((a, b) => a.number - b.number)
+    .map((a) => ({ number: a.number, pieces: splitStory(splitStory(story, a.to).earlier, a.from).current }))
 
   /** Saves what is written right away, then opens the drawing page */
   const openDraw = async () => {
@@ -166,7 +152,7 @@ export default function StoryPage() {
       await storeSave(id.current, {
         ...save,
         phase: 'playing',
-        play: { ...save.play, act: save.play?.act ?? 1, actState: save.play?.actState ?? 'writing', story: pieces },
+        play: { ...save.play, act: save.play?.act ?? 1, actState: save.play?.actState ?? 'writing', story },
       })
     } catch {
       return setSaveState('failed')
@@ -182,7 +168,7 @@ export default function StoryPage() {
   return (
     <Frame
       actions={
-        <Button onClick={() => keep(pieces, 0)} disabled={saveState === 'saving'} role="status">
+        <Button onClick={() => keep(story, 0)} disabled={saveState === 'saving'} role="status">
           {{ saved: 'Saved ✓', saving: 'Saving…', failed: 'Not saved' }[saveState]}
         </Button>
       }
@@ -193,6 +179,21 @@ export default function StoryPage() {
           Act {now.number} · {now.state === 'drawn' ? 'Drawn' : 'Writing'}
         </span>
       </div>
+      {history.length > 0 && (
+        <details className={styles.history} open>
+          <summary>
+            Story so far · {history.length} {history.length === 1 ? 'act' : 'acts'}
+          </summary>
+          <div className={styles.historyActs}>
+            {history.map((a) => (
+              <section key={a.number} className={styles.historyAct}>
+                <h3>Act {roman(a.number)}</h3>
+                <p>{paint(a.pieces, `h${a.number}-`)}</p>
+              </section>
+            ))}
+          </div>
+        </details>
+      )}
       <div className={styles.toolbar} style={{ '--writer': writing?.color } as CSSProperties}>
         <span className={styles.label}>Writing as</span>
         <div className={styles.writers} role="radiogroup" aria-label="Who is writing">
@@ -236,13 +237,11 @@ export default function StoryPage() {
         )}
       </div>
       {/* Shown only when something is going on; the field's placeholder already says how to write */}
-      {(lockNote || dictation.error || dictation.listening) && (
+      {(dictation.error || dictation.listening) && (
         <p className={dictation.listening ? `${styles.hint} ${styles.listening}` : styles.hint} role="status">
-          {lockNote
-            ? `Acts already drawn are locked. Write act ${now.number} after them.`
-            : dictation.error
-              ? `${dictation.error}. You can still type in the box.`
-              : dictation.heard || `Listening to ${writing?.name ?? 'you'}… speak now, then press ■ to finish.`}
+          {dictation.error
+            ? `${dictation.error}. You can still type in the box.`
+            : dictation.heard || `Listening to ${writing?.name ?? 'you'}… speak now, then press ■ to finish.`}
         </p>
       )}
       <div
@@ -250,7 +249,7 @@ export default function StoryPage() {
         style={{ '--writer': writing?.color } as CSSProperties}
       >
         <div ref={mirror} className={styles.mirror} aria-hidden="true">
-          {paint(piecesAround(pieces, caret).before, 0, 'b')}
+          {paint(piecesAround(pieces, caret).before, 'b')}
           {showCursor && writing && (
             <span ref={marker} className={below ? `${styles.marker} ${styles.below}` : styles.marker}>
               <span
@@ -267,7 +266,7 @@ export default function StoryPage() {
               </span>
             </span>
           )}
-          {paint(piecesAround(pieces, caret).after, caret, 'a')}
+          {paint(piecesAround(pieces, caret).after, 'a')}
           {/* Keeps a last empty line the same height as in the field */}
           {'​'}
         </div>
@@ -302,8 +301,8 @@ export default function StoryPage() {
       <div className={styles.drawRow}>
         <Button
           variant="primary"
-          disabled={!actText.trim() || saveState === 'saving'}
-          title={actText.trim() ? undefined : `Write act ${now.number} first`}
+          disabled={!text.trim() || saveState === 'saving'}
+          title={text.trim() ? undefined : `Write act ${now.number} first`}
           onClick={openDraw}
         >
           <BrushIcon />
