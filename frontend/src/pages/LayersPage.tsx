@@ -2,11 +2,11 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as R
 import PixelScene from '../components/pixel-scene/PixelScene'
 import { ActSteps, Button, Eyebrow, MusicToggle, Panel, SectionTitle, TextInput } from '../components/ui'
 import { roman } from '../data/roman'
-import { pixelize, splitImage } from '../api/images'
+import { editLayer, pixelize, splitImage } from '../api/images'
 import { pictureData, storePicture } from '../api/pictures'
 import { clearPicked, loadPicked, type PickedPicture } from '../data/picked'
 import { actStart, loadSave, storeSave, type ActSave, type Save } from '../data/saves'
-import { storyText } from '../data/story'
+import { editStory, splitStory, storyText, type StoryPiece } from '../data/story'
 import styles from './LayersPage.module.css'
 
 const MAX_OBJECTS = 8
@@ -28,6 +28,8 @@ type StageLayer = {
   w: number
   h: number
   hidden: boolean
+  /** The repaint instructions this layer went through, oldest first; they also go into the act's prompt */
+  edits?: string[]
   /** Where the split put it, for Reset */
   start: { x: number; y: number; w: number; h: number }
 }
@@ -95,7 +97,40 @@ const moved = (l: StageLayer) => ({
   dy: l.y - l.start.y,
   scale: l.w / l.start.w,
   hidden: l.hidden,
+  edits: l.edits ?? [],
 })
+
+/** A layer made ready again, put back where it was moved to, with its repaints */
+const placeAgain = (l: StageLayer, m: ReturnType<typeof moved>): StageLayer => ({
+  ...l,
+  x: l.x + m.dx,
+  y: l.y + m.dy,
+  w: l.w * m.scale,
+  h: l.h * m.scale,
+  hidden: m.hidden,
+  edits: m.edits,
+})
+
+/** The repaints as lines added to the act's text: " tree: autumn leaves." */
+const repaintLines = (layers: { name: string; edits?: string[] }[]) =>
+  layers.flatMap((l) => (l.edits ?? []).map((e) => ` ${l.name}: ${e}.`)).join('')
+
+/**
+ * The story with this act's text ending in the current repaint lines instead of the ones saved before,
+ * so a repaint shows on the story and drawing pages too, and Undo takes its line out again.
+ */
+function storyWithRepaints(story: StoryPiece[], start: number, before: string, after: string, writer: string) {
+  const { earlier, current } = splitStory(story, start)
+  let text = storyText(current)
+  if (before && text.endsWith(before)) text = text.slice(0, -before.length)
+  return [...earlier, ...editStory(current, text + after, writer)]
+}
+
+/** The act's prompt with the repaints added, each once: "…, tree: autumn leaves" */
+function promptWithEdits(base: string, layers: StageLayer[]) {
+  const added = layers.flatMap((l) => (l.edits ?? []).map((e) => `${l.name}: ${e}`)).filter((e) => !base.includes(e))
+  return [base, ...added].join(', ')
+}
 
 /**
  * The picked picture, split into a background and one layer per object.
@@ -122,6 +157,13 @@ export default function LayersPage() {
   const [layers, setLayers] = useState<StageLayer[]>([])
   const [selected, setSelected] = useState<number | null>(null)
   const [splitting, setSplitting] = useState(false)
+  /** A short message in the toolbar, such as what was just deleted */
+  const [notice, setNotice] = useState<string | null>(null)
+  const noticeTimer = useRef<number | undefined>(undefined)
+  /** Changing the selected layer by a text instruction */
+  const [editText, setEditText] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [editNote, setEditNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const stage = useRef<HTMLDivElement>(null)
   /** The drag going on: moving a layer, or resizing it from its corner */
@@ -143,7 +185,7 @@ export default function LayersPage() {
         )
         const restored = (await stageLayers(parts, loaded.setup.style === 'pixel')).map((l, i) => {
           const m = kept.layers[i]
-          return { ...l, x: l.x + m.dx, y: l.y + m.dy, w: l.w * m.scale, h: l.h * m.scale, hidden: m.hidden }
+          return placeAgain(l, { ...m, edits: m.edits ?? [] })
         })
         setPicked({ image, prompt: kept.prompt, seed: kept.seed, pictureId: kept.pictureId })
         setLayers(restored)
@@ -157,6 +199,61 @@ export default function LayersPage() {
   const pixelStyle = save?.setup.style === 'pixel'
   const drawLink = id ? `/draw?save=${encodeURIComponent(id)}` : '/saves'
 
+  /**
+   * Keeps the act: the picked picture and every layer go to the backend once (only their ids go in the save),
+   * then the save gets the act with how each layer was moved, and the act counts as drawn.
+   */
+  const keepAct = async (current: StageLayer[] = layers): Promise<Save | null> => {
+    if (!id || !save || !picked || saving === 'saving') return null
+    setSaving('saving')
+    setError(null)
+    try {
+      const pictureId = picked.pictureId ?? (await storePicture(id, picked.image))
+      const ids = await Promise.all(current.map((l) => l.sourceId ?? storePicture(id, l.source)))
+      setPicked({ ...picked, pictureId })
+      // Remember which pictures are kept, so they are not sent again
+      const kept = new Map(current.map((l, i) => [l.source, ids[i]]))
+      setLayers((all) => all.map((l) => ({ ...l, sourceId: l.sourceId ?? kept.get(l.source) })))
+      const number = save.play?.act ?? 1
+      const start = actStart(save.play, number)
+      const before = repaintLines(save.play?.acts?.find((a) => a.number === number)?.layers ?? [])
+      const oldStory = save.play?.story ?? []
+      const writer = splitStory(oldStory, start).current.at(-1)?.heroId ?? save.setup.party[0]?.id ?? ''
+      const story = storyWithRepaints(oldStory, start, before, repaintLines(current), writer)
+      const act: ActSave = {
+        number,
+        from: start,
+        to: storyText(story).length,
+        // A prompt changed on the drawing page since the picture was picked wins
+        // and the repaints are added, so Undo of a repaint takes its words out again
+        prompt: promptWithEdits(save.play?.draft?.act === number ? save.play.draft.prompt : picked.prompt, current),
+        seed: picked.seed,
+        pictureId,
+        layers: current.map((l, i) => ({ name: l.name, pictureId: ids[i], ...moved(l) })),
+      }
+      const play = save.play ?? {}
+      const next: Save = {
+        ...save,
+        phase: 'playing',
+        play: {
+          ...play,
+          story,
+          act: number,
+          actState: 'drawn',
+          acts: [...(play.acts ?? []).filter((a) => a.number !== number), act],
+        },
+      }
+      await storeSave(id, next)
+      setSave(next)
+      setSaving('saved')
+      return next
+    } catch (failure) {
+      setError((failure as Error).message)
+      setSaving('failed')
+      return null
+    }
+  }
+
   const split = async () => {
     if (!picked || names.length === 0 || names.length > MAX_OBJECTS || splitting) return
     setError(null)
@@ -164,8 +261,9 @@ export default function LayersPage() {
     try {
       const next = await stageLayers(await splitImage(picked.image, names), pixelStyle)
       setLayers(next)
-      setSaving('idle')
       setSelected(next.length > 1 ? 1 : null)
+      // Kept right away: a split takes the GPU a minute, and a page reload would otherwise lose it
+      void keepAct(next)
     } catch (failure) {
       setError((failure as Error).message)
     }
@@ -175,11 +273,17 @@ export default function LayersPage() {
   /** Earlier versions of the layers, newest last, for Undo */
   const history = useRef<StageLayer[][]>([])
   const [undoCount, setUndoCount] = useState(0)
+  /** Steps taken back by Undo, newest last, for Redo */
+  const future = useRef<StageLayer[][]>([])
+  const [redoCount, setRedoCount] = useState(0)
 
   /** Remembers the layers as they are now, so the next change can be undone */
   const remember = () => {
     history.current = [...history.current.slice(-49), layers]
     setUndoCount(history.current.length)
+    // A new change ends the steps Redo could bring back
+    future.current = []
+    setRedoCount(0)
   }
 
   /** Replaces all layers, as one step that Undo can take back */
@@ -196,21 +300,88 @@ export default function LayersPage() {
     setSaving('idle')
   }
 
+  /** Shows an earlier or later version of the layers */
+  const show = (version: StageLayer[]) => {
+    setLayers(version)
+    const still = selected !== null && selected < version.length ? selected : null
+    setSelected(still)
+    // The repaint box shows the instruction of the version now shown
+    setEditText(still === null ? '' : (version[still].edits?.at(-1) ?? ''))
+    setSaving('idle')
+    void keepAct(version) // Kept at once, so a reload does not bring back an undone repaint
+  }
+
+  /** Back to naming the objects: the layers and their steps are dropped */
+  const splitAgain = () => {
+    history.current = []
+    future.current = []
+    setUndoCount(0)
+    setRedoCount(0)
+    setLayers([])
+  }
+
   const undo = () => {
     const last = history.current.at(-1)
     if (!last) return
     history.current = history.current.slice(0, -1)
+    future.current = [...future.current, layers]
     setUndoCount(history.current.length)
-    setLayers(last)
-    setSelected((s) => (s !== null && s < last.length ? s : null))
-    setSaving('idle')
+    setRedoCount(future.current.length)
+    show(last)
+  }
+
+  const redo = () => {
+    const next = future.current.at(-1)
+    if (!next) return
+    future.current = future.current.slice(0, -1)
+    history.current = [...history.current, layers]
+    setUndoCount(history.current.length)
+    setRedoCount(future.current.length)
+    show(next)
+  }
+
+  /**
+   * Repaints the selected layer from a text instruction. The whole layer goes to the model, as the split made it;
+   * then every layer is made ready again (one shared pixel palette), keeping where each was moved to.
+   */
+  const repaint = async () => {
+    const index = selected
+    const text = editText.trim()
+    if (index === null || !text || editing) return
+    setEditing(true)
+    setEditNote(null)
+    setError(null)
+    try {
+      const { image, accepted } = await editLayer(layers[index].source, layers[index].name, text)
+      const parts = layers.map((l, i) => ({
+        name: l.name,
+        image: i === index ? image : l.source,
+        id: i === index ? undefined : l.sourceId,
+      }))
+      const fresh = await stageLayers(parts, pixelStyle)
+      const next = fresh.map((l, i) => {
+        const m = moved(layers[i])
+        return placeAgain(l, i === index ? { ...m, edits: [...m.edits, text] } : m)
+      })
+      commit(next)
+      void keepAct(next) // A repaint is GPU work too, so it is kept at once
+      if (!accepted) setEditNote('The model was not sure about this change; Undo takes it back.')
+    } catch (failure) {
+      setError((failure as Error).message)
+    }
+    setEditing(false)
   }
 
   /** Deletes an object layer; the background always stays */
   const remove = (index: number) => {
     if (index === 0) return
-    commit(layers.filter((_, i) => i !== index))
-    setSelected(null)
+    const next = layers.filter((_, i) => i !== index)
+    commit(next)
+    // Keep a layer selected, so the side panel stays; the note says how to get the deleted one back
+    setSelected(next.length > 1 ? Math.min(index, next.length - 1) : null)
+    setNotice(`Deleted ${layers[index].name}. Undo brings it back.`)
+    window.clearTimeout(noticeTimer.current)
+    noticeTimer.current = window.setTimeout(() => setNotice(null), 4000)
   }
 
   /** Moves an object layer one place to the front (+1) or the back (-1); the background stays at the back */
@@ -223,66 +394,27 @@ export default function LayersPage() {
     setSelected(to)
   }
 
-  // Ctrl+Z (or Cmd+Z) undoes, except while typing in a field
+  // Ctrl+Z undoes, Ctrl+Y or Ctrl+Shift+Z redoes (Cmd on a Mac), except while typing in a field
   const undoRef = useRef(undo)
+  const redoRef = useRef(redo)
   useEffect(() => {
     undoRef.current = undo
+    redoRef.current = redo
   })
   useEffect(() => {
     const onKey = (event: globalThis.KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z' || event.shiftKey) return
+      if (!(event.ctrlKey || event.metaKey)) return
+      const key = event.key.toLowerCase()
+      const wantsRedo = key === 'y' || (key === 'z' && event.shiftKey)
+      if (key !== 'z' && !wantsRedo) return
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return
       event.preventDefault()
-      undoRef.current()
+      if (wantsRedo) redoRef.current()
+      else undoRef.current()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
-
-  /**
-   * Keeps the act: the picked picture and every layer go to the backend once (only their ids go in the save),
-   * then the save gets the act with how each layer was moved, and the act counts as drawn.
-   */
-  const keepAct = async (): Promise<Save | null> => {
-    if (!id || !save || !picked || saving === 'saving') return null
-    setSaving('saving')
-    setError(null)
-    try {
-      const pictureId = picked.pictureId ?? (await storePicture(id, picked.image))
-      const ids = await Promise.all(layers.map((l) => l.sourceId ?? storePicture(id, l.source)))
-      setPicked({ ...picked, pictureId })
-      setLayers((all) => all.map((l, i) => ({ ...l, sourceId: ids[i] })))
-      const number = save.play?.act ?? 1
-      const act: ActSave = {
-        number,
-        from: actStart(save.play, number),
-        to: storyText(save.play?.story ?? []).length,
-        prompt: picked.prompt,
-        seed: picked.seed,
-        pictureId,
-        layers: layers.map((l, i) => ({ name: l.name, pictureId: ids[i], ...moved(l) })),
-      }
-      const play = save.play ?? {}
-      const next: Save = {
-        ...save,
-        phase: 'playing',
-        play: {
-          ...play,
-          act: number,
-          actState: 'drawn',
-          acts: [...(play.acts ?? []).filter((a) => a.number !== number), act],
-        },
-      }
-      await storeSave(id, next)
-      setSave(next)
-      setSaving('saved')
-      return next
-    } catch (failure) {
-      setError((failure as Error).message)
-      setSaving('failed')
-      return null
-    }
-  }
 
   /** Keeps the act (if it is not kept yet), then the story goes on with the next act, written after this one's text */
   const nextAct = async () => {
@@ -358,7 +490,7 @@ export default function LayersPage() {
             <Button href="/">Home</Button>
             <MusicToggle />
             {layers.length > 0 && (
-              <Button onClick={keepAct} disabled={saving === 'saving' || saving === 'saved'}>
+              <Button onClick={() => keepAct()} disabled={saving === 'saving' || saving === 'saved'}>
                 {{ idle: 'Save', saving: 'Saving…', saved: 'Saved ✓', failed: 'Save again' }[saving]}
               </Button>
             )}
@@ -380,169 +512,207 @@ export default function LayersPage() {
               </Button>
             </>
           ) : layers.length === 0 ? (
-            <div className={styles.editor}>
-              <div className={styles.picture}>
-                <img
-                  src={pixelStyle && picked.pixel ? picked.pixel : picked.image}
-                  alt="The picked picture"
-                  className={pixelStyle ? styles.pixel : undefined}
-                />
-                {splitting && <span className={styles.working}>Cutting out {names.length} objects…</span>}
-              </div>
-              <div className={styles.side}>
-                <span className={styles.sideTitle}>Objects to cut out</span>
-                <TextInput
-                  label="Back to front, with commas"
-                  placeholder="cottage, tree, fox"
-                  value={namesText}
-                  maxLength={500}
-                  disabled={splitting}
-                  onChange={(e) => setNamesText(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && split()}
-                />
-                <span className={styles.hint}>
-                  {names.length > MAX_OBJECTS
-                    ? `At most ${MAX_OBJECTS} objects at once`
-                    : `${names.length} object${names.length === 1 ? '' : 's'} + the background`}
-                </span>
-                <div className={styles.next}>
-                  <Button href={drawLink}>Back</Button>
-                  <Button
-                    variant="primary"
-                    disabled={names.length === 0 || names.length > MAX_OBJECTS || splitting}
-                    onClick={split}
-                  >
-                    {splitting ? 'Splitting…' : 'Split'}
-                  </Button>
+            <>
+              <div className={styles.editor}>
+                <div className={styles.picture}>
+                  <img
+                    src={pixelStyle && picked.pixel ? picked.pixel : picked.image}
+                    alt="The picked picture"
+                    className={pixelStyle ? styles.pixel : undefined}
+                  />
+                  {splitting && <span className={styles.working}>Cutting out {names.length} objects…</span>}
+                </div>
+                <div className={styles.side}>
+                  <span className={styles.sideTitle}>Objects to cut out</span>
+                  <TextInput
+                    label="Back to front, with commas"
+                    placeholder="cottage, tree, fox"
+                    value={namesText}
+                    maxLength={500}
+                    disabled={splitting}
+                    onChange={(e) => setNamesText(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && split()}
+                  />
+                  <span className={styles.hint}>
+                    {names.length > MAX_OBJECTS
+                      ? `At most ${MAX_OBJECTS} objects at once`
+                      : `${names.length} object${names.length === 1 ? '' : 's'} + the background`}
+                  </span>
                 </div>
               </div>
-            </div>
+              <footer className={styles.footer}>
+                <Button href={drawLink}>Back</Button>
+                <Button
+                  variant="primary"
+                  disabled={names.length === 0 || names.length > MAX_OBJECTS || splitting}
+                  onClick={split}
+                >
+                  {splitting ? 'Splitting…' : 'Split'}
+                </Button>
+              </footer>
+            </>
           ) : (
-            <div className={styles.editor}>
-              <div
-                ref={stage}
-                className={styles.stage}
-                tabIndex={0}
-                aria-label="The scene: drag a layer to move it, drag its corner to resize it, arrow keys nudge it"
-                onPointerDown={() => setSelected(null)}
-                onKeyDown={nudge}
-              >
-                {layers.map((l, i) =>
-                  l.hidden ? null : (
-                    <div
-                      key={l.name + i}
-                      className={`${styles.layer} ${i === 0 ? styles.background : ''} ${selected === i ? styles.selected : ''}`}
-                      style={{ left: percent(l.x), top: percent(l.y), width: percent(l.w), height: percent(l.h) }}
-                      onPointerDown={(e) => startDrag(e, i, 'move')}
-                      onPointerMove={moveDrag}
-                      onPointerUp={endDrag}
-                      onPointerCancel={endDrag}
-                    >
-                      <img
-                        src={l.image}
-                        alt={l.name}
-                        draggable={false}
-                        className={pixelStyle ? styles.pixel : undefined}
-                      />
-                      {selected === i && (
-                        <span
-                          className={styles.handle}
-                          aria-hidden="true"
-                          onPointerDown={(e) => startDrag(e, i, 'resize')}
-                          onPointerMove={moveDrag}
-                          onPointerUp={endDrag}
-                          onPointerCancel={endDrag}
-                        />
-                      )}
-                    </div>
-                  ),
-                )}
-              </div>
-
-              <div className={styles.side}>
-                <span className={styles.sideTitle}>Layers</span>
-                <ol className={styles.list}>
-                  {layers.map((l, i) => (
-                    <li key={l.name + i} className={selected === i ? styles.current : undefined}>
-                      <button type="button" className={styles.layerName} onClick={() => setSelected(i)}>
-                        <img src={l.image} alt="" className={pixelStyle ? styles.pixel : undefined} />
-                        {l.name}
-                      </button>
-                      <span className={styles.tools}>
-                        {i > 0 && (
-                          <>
-                            <button
-                              type="button"
-                              className={styles.eye}
-                              aria-label={`Move ${l.name} to the front`}
-                              title="Further to the front"
-                              disabled={i === layers.length - 1}
-                              onClick={() => reorder(i, 1)}
-                            >
-                              ▲
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.eye}
-                              aria-label={`Move ${l.name} to the back`}
-                              title="Further to the back"
-                              disabled={i === 1}
-                              onClick={() => reorder(i, -1)}
-                            >
-                              ▼
-                            </button>
-                          </>
-                        )}
-                        <button
-                          type="button"
-                          className={styles.eye}
-                          aria-pressed={!l.hidden}
-                          aria-label={l.hidden ? `Show ${l.name}` : `Hide ${l.name}`}
-                          title={l.hidden ? 'Show' : 'Hide'}
-                          onClick={() => change(i, { hidden: !l.hidden })}
-                        >
-                          <EyeIcon open={!l.hidden} />
-                        </button>
-                        {i > 0 && (
-                          <button
-                            type="button"
-                            className={`${styles.eye} ${styles.bin}`}
-                            aria-label={`Delete ${l.name}`}
-                            title="Delete this layer"
-                            onClick={() => remove(i)}
-                          >
-                            <BinIcon />
-                          </button>
-                        )}
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-                <div className={styles.row}>
+            <>
+              <div className={styles.toolbar}>
+                <span className={notice ? styles.notice : styles.hint} role="status">
+                  {notice ?? 'Drag to move · drag the corner to resize · arrow keys nudge'}
+                </span>
+                <div className={styles.tools}>
                   <Button onClick={undo} disabled={undoCount === 0} title="Undo (Ctrl+Z)">
                     ↶ Undo
+                  </Button>
+                  <Button onClick={redo} disabled={redoCount === 0} title="Redo (Ctrl+Y)">
+                    ↷ Redo
                   </Button>
                   <Button onClick={() => commit(layers.map((l) => ({ ...l, ...l.start, hidden: false })))}>
                     Reset
                   </Button>
-                </div>
-                <Button
-                  onClick={() => {
-                    history.current = []
-                    setUndoCount(0)
-                    setLayers([])
-                  }}
-                >
-                  Split again
-                </Button>
-                <div className={styles.next}>
-                  <Button href={drawLink}>Back</Button>
-                  <Button variant="primary" onClick={nextAct} disabled={saving === 'saving'}>
-                    {saving === 'saving' ? 'Saving…' : `Write act ${(save?.play?.act ?? 1) + 1} →`}
-                  </Button>
+                  <Button onClick={splitAgain}>Split again</Button>
                 </div>
               </div>
-            </div>
+              <div className={styles.editor}>
+                <div
+                  ref={stage}
+                  className={styles.stage}
+                  tabIndex={0}
+                  aria-label="The scene: drag a layer to move it, drag its corner to resize it, arrow keys nudge it"
+                  onPointerDown={() => setSelected(null)}
+                  onKeyDown={nudge}
+                >
+                  {layers.map((l, i) =>
+                    l.hidden ? null : (
+                      <div
+                        key={l.name + i}
+                        className={`${styles.layer} ${i === 0 ? styles.background : ''} ${selected === i ? styles.selected : ''}`}
+                        style={{ left: percent(l.x), top: percent(l.y), width: percent(l.w), height: percent(l.h) }}
+                        onPointerDown={(e) => startDrag(e, i, 'move')}
+                        onPointerMove={moveDrag}
+                        onPointerUp={endDrag}
+                        onPointerCancel={endDrag}
+                      >
+                        <img
+                          src={l.image}
+                          alt={l.name}
+                          draggable={false}
+                          className={pixelStyle ? styles.pixel : undefined}
+                        />
+                        {selected === i && (
+                          <span
+                            className={styles.handle}
+                            aria-hidden="true"
+                            onPointerDown={(e) => startDrag(e, i, 'resize')}
+                            onPointerMove={moveDrag}
+                            onPointerUp={endDrag}
+                            onPointerCancel={endDrag}
+                          />
+                        )}
+                      </div>
+                    ),
+                  )}
+                </div>
+
+                <div className={styles.side}>
+                  <span className={styles.sideTitle}>Layers</span>
+                  <ol className={styles.list}>
+                    {layers.map((l, i) => (
+                      <li key={l.name + i} className={selected === i ? styles.current : undefined}>
+                        <button type="button" className={styles.layerName} onClick={() => setSelected(i)}>
+                          <img src={l.image} alt="" className={pixelStyle ? styles.pixel : undefined} />
+                          {l.name}
+                        </button>
+                        <span className={styles.tools}>
+                          {i > 0 && (
+                            <>
+                              <button
+                                type="button"
+                                className={styles.eye}
+                                aria-label={`Move ${l.name} to the front`}
+                                title="Further to the front"
+                                disabled={i === layers.length - 1}
+                                onClick={() => reorder(i, 1)}
+                              >
+                                ▲
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.eye}
+                                aria-label={`Move ${l.name} to the back`}
+                                title="Further to the back"
+                                disabled={i === 1}
+                                onClick={() => reorder(i, -1)}
+                              >
+                                ▼
+                              </button>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            className={styles.eye}
+                            aria-pressed={!l.hidden}
+                            aria-label={l.hidden ? `Show ${l.name}` : `Hide ${l.name}`}
+                            title={l.hidden ? 'Show' : 'Hide'}
+                            onClick={() => change(i, { hidden: !l.hidden })}
+                          >
+                            <EyeIcon open={!l.hidden} />
+                          </button>
+                          {i > 0 && (
+                            <button
+                              type="button"
+                              className={`${styles.eye} ${styles.bin}`}
+                              aria-label={`Delete ${l.name}`}
+                              title="Delete this layer"
+                              onClick={() => remove(i)}
+                            >
+                              <BinIcon />
+                            </button>
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                  {selected !== null && layers[selected] && (
+                    <form
+                      className={styles.editBox}
+                      onSubmit={(event) => {
+                        event.preventDefault()
+                        repaint()
+                      }}
+                    >
+                      <label htmlFor="repaint" className={styles.editTitle}>
+                        ✎ Repaint the {layers[selected].name}
+                      </label>
+                      <span className={styles.hint}>Describe the change</span>
+                      <textarea
+                        id="repaint"
+                        className={styles.editText}
+                        rows={4}
+                        placeholder="e.g. autumn leaves, orange and red"
+                        value={editText}
+                        maxLength={300}
+                        disabled={editing}
+                        onChange={(e) => setEditText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault()
+                            repaint()
+                          }
+                        }}
+                      />
+                      <Button type="submit" variant="primary" disabled={!editText.trim() || editing}>
+                        {editing ? 'Repainting… (~30 s)' : 'Repaint'}
+                      </Button>
+                      {editNote && <span className={styles.hint}>{editNote}</span>}
+                    </form>
+                  )}
+                </div>
+              </div>
+              <footer className={styles.footer}>
+                <Button href={drawLink}>Back</Button>
+                <Button variant="primary" onClick={nextAct} disabled={saving === 'saving'}>
+                  {saving === 'saving' ? 'Saving…' : `Write act ${(save?.play?.act ?? 1) + 1} →`}
+                </Button>
+              </footer>
+            </>
           )}
 
           {error && (
