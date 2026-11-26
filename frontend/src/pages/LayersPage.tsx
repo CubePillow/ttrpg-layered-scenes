@@ -7,6 +7,7 @@ import { pictureData, storePicture } from '../api/pictures'
 import { clearPicked, loadPicked, type PickedPicture } from '../data/picked'
 import { actStart, loadSave, storeSave, type ActSave, type Save } from '../data/saves'
 import { editStory, splitStory, storyText, type StoryPiece } from '../data/story'
+import { exportLayersZip, exportScenePng, fileSafe, pictureSize } from '../data/exportScene'
 import styles from './LayersPage.module.css'
 
 const MAX_OBJECTS = 8
@@ -192,6 +193,8 @@ export default function LayersPage() {
   const [editing, setEditing] = useState(false)
   const [editNote, setEditNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  /** Saving the scene or its layers as files */
+  const [exporting, setExporting] = useState<'scene' | 'layers' | null>(null)
   const stage = useRef<HTMLDivElement>(null)
   /** The drag going on: moving a layer, or resizing it from its corner */
   const drag = useRef<{ index: number; mode: 'move' | 'resize'; px: number; py: number; box: StageLayer } | null>(null)
@@ -432,6 +435,36 @@ export default function LayersPage() {
     noticeTimer.current = window.setTimeout(() => setNotice(null), 4000)
   }
 
+  /** A short message in the toolbar that goes away by itself */
+  const flash = (message: string) => {
+    setNotice(message)
+    window.clearTimeout(noticeTimer.current)
+    noticeTimer.current = window.setTimeout(() => setNotice(null), 4000)
+  }
+
+  /** Saves the scene as one PNG, or every shown layer as its own PNG in a ZIP, named after the story and the act */
+  const exportAs = async (kind: 'scene' | 'layers') => {
+    if (exporting || layers.length === 0) return
+    setExporting(kind)
+    setError(null)
+    try {
+      const size = await pictureSize(layers[0].source)
+      const act = openAct ?? save?.play?.act ?? 1
+      const baseName = `${fileSafe(save?.setup.title ?? 'scene')}-act-${act}`
+      if (kind === 'scene') {
+        await exportScenePng(layers, size, pixelStyle, baseName)
+        flash('Saved the scene as a PNG.')
+      } else {
+        await exportLayersZip(layers, size, pixelStyle, baseName)
+        flash('Saved every shown layer as a PNG, in one ZIP.')
+      }
+    } catch {
+      setError('The export did not work. Please try again.')
+    } finally {
+      setExporting(null)
+    }
+  }
+
   /** Moves an object layer one place to the front (+1) or the back (-1); the background stays at the back */
   const reorder = (index: number, step: 1 | -1) => {
     const to = index + step
@@ -623,6 +656,20 @@ export default function LayersPage() {
                     Reset
                   </Button>
                   {!arrangeOnly && <Button onClick={splitAgain}>Split again</Button>}
+                  <Button
+                    onClick={() => void exportAs('scene')}
+                    disabled={exporting !== null}
+                    title="Save the scene as it looks now, as one PNG"
+                  >
+                    {exporting === 'scene' ? 'Saving…' : '⤓ Export PNG'}
+                  </Button>
+                  <Button
+                    onClick={() => void exportAs('layers')}
+                    disabled={exporting !== null}
+                    title="Save every shown layer as its own PNG, in one ZIP"
+                  >
+                    {exporting === 'layers' ? 'Saving…' : '⤓ Export layers'}
+                  </Button>
                 </div>
               </div>
               <div className={styles.editor}>
