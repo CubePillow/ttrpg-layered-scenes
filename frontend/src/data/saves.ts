@@ -60,6 +60,8 @@ export type PlaySave = {
   /** Kept for saves from before acts */
   scene?: number
   actState?: ActState
+  /** The gamemaster's direction for the players' story contributions */
+  gmDirection?: string
   story?: StoryPiece[]
   acts?: ActSave[]
   /** The picture prompt as last written on the drawing page, for the act being played */

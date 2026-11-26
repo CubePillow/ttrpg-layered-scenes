@@ -9,6 +9,7 @@ A save is a JSON object in layers, so later parts of the game add to it without 
       "play": null | {
         "act": 2,                                    # the act being played, from 1
         "actState": "writing" | "drawn",             # where that act stands
+      "gmDirection": "...",                        # the gamemaster's direction for the act
         "story": [{"heroId", "text"}, ...],          # the shared story text, in pieces by who wrote them
         "draft": {"act", "prompt"},                  # the picture prompt as last written on the drawing page
         "acts": [{                                   # drawn acts; pictures are kept apart (pictures.py), by id

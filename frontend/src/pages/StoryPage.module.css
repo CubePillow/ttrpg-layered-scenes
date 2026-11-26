@@ -63,6 +63,67 @@
   margin: 0;
 }
 
+.direction {
+  display: grid;
+  gap: 6px;
+}
+
+.directionLabel {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.directionHint {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.65;
+}
+
+.directionEditor {
+  position: relative;
+  height: 150px;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-left: 4px solid #e8b44a;
+  background: rgba(0, 0, 0, 0.4);
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.directionEditor:focus-within {
+  border-color: #e8b44a;
+}
+
+.directionField {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 18px 22px 36px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: 1.05rem/1.8 system-ui, sans-serif;
+  resize: none;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.directionField::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.directionTotal {
+  position: absolute;
+  right: 22px;
+  bottom: 6px;
+  z-index: 1;
+  font-size: 0.75rem;
+  opacity: 0.55;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 /* Which act is being played, and whether it is still being written or already drawn */
 .actTag {
   padding: 3px 10px;
