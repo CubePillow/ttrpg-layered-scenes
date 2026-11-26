@@ -10,6 +10,12 @@ A save is a JSON object in layers, so later parts of the game add to it without 
         "act": 2,                                    # the act being played, from 1
         "actState": "writing" | "drawn",             # where that act stands
         "story": [{"heroId", "text"}, ...],          # the shared story text, in pieces by who wrote them
+        "draft": {"act", "prompt"},                  # the picture prompt as last written on the drawing page
+        "acts": [{                                   # drawn acts; pictures are kept apart (pictures.py), by id
+          "number", "from", "to",                    # the act's part of the story text
+          "number", "prompt", "seed", "pictureId",   # the picked picture, as the model drew it
+          "layers": [{"name", "pictureId", "dx", "dy", "scale", "hidden", "edits", "removed"}, ...]  # split layers, back to front,
+        }, ...]                                      #   and how far each was moved and resized from where it was cut
       }
     }
 
@@ -29,6 +35,7 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Request
 
 from games import connect, now
+from pictures import delete_pictures_of
 
 router = APIRouter(prefix="/api/saves", tags=["saves"])
 
@@ -162,3 +169,4 @@ def delete_save(save_id: str):
     with connect() as connection:
         open_saves(connection)
         connection.execute("DELETE FROM saves WHERE id = ?", (save_id,))
+        delete_pictures_of(connection, save_id)

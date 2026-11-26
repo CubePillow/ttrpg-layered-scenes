@@ -1,0 +1,15 @@
+/* Takes the room left beside the buttons, on the same line */
+.steps {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.steps ol {
+  flex-wrap: nowrap;
+  gap: 12px;
+  margin: 0;
+}
+
+.steps li {
+  white-space: nowrap;
+}
