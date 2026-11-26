@@ -28,7 +28,12 @@ export function editStory(pieces: StoryPiece[], next: string, heroId: string): S
   let start = 0
   while (start < old.length && start < next.length && old[start] === next[start]) start++
   let end = 0
-  while (end < old.length - start && end < next.length - start && old[old.length - 1 - end] === next[next.length - 1 - end]) end++
+  while (
+    end < old.length - start &&
+    end < next.length - start &&
+    old[old.length - 1 - end] === next[next.length - 1 - end]
+  )
+    end++
 
   const removedTo = old.length - end
   const before: StoryPiece[] = []
@@ -43,7 +48,8 @@ export function editStory(pieces: StoryPiece[], next: string, heroId: string): S
   return tidy([...before, { heroId, text: next.slice(start, next.length - end) }, ...after])
 }
 
-const words = typeof Intl !== 'undefined' && 'Segmenter' in Intl ? new Intl.Segmenter(undefined, { granularity: 'word' }) : null
+const words =
+  typeof Intl !== 'undefined' && 'Segmenter' in Intl ? new Intl.Segmenter(undefined, { granularity: 'word' }) : null
 
 /** How many words each hero has written. Chinese and other text without spaces is counted by its words too. */
 export function wordsByHero(pieces: StoryPiece[]): Record<string, number> {
@@ -55,4 +61,18 @@ export function wordsByHero(pieces: StoryPiece[]): Record<string, number> {
     counts[piece.heroId] = (counts[piece.heroId] ?? 0) + n
   }
   return counts
+}
+
+/** The story split at a place in the text: the pieces before it (earlier acts) and after it (this act). */
+export function splitStory(pieces: StoryPiece[], at: number) {
+  const earlier: StoryPiece[] = []
+  const current: StoryPiece[] = []
+  let from = 0
+  for (const piece of pieces) {
+    const cut = Math.min(Math.max(at - from, 0), piece.text.length)
+    if (cut > 0) earlier.push({ heroId: piece.heroId, text: piece.text.slice(0, cut) })
+    if (cut < piece.text.length) current.push({ heroId: piece.heroId, text: piece.text.slice(cut) })
+    from += piece.text.length
+  }
+  return { earlier, current }
 }

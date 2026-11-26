@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from pixelize import pixelize, trim, used_colors
 
 from games import router as games_router
+from pictures import router as pictures_router
 from saves import router as saves_router
 
 app = FastAPI(title="TTRPG Layered Scene Builder API")
@@ -37,6 +38,7 @@ app.add_middleware(
 
 app.include_router(games_router)
 app.include_router(saves_router)
+app.include_router(pictures_router)
 app.include_router(kaggle_router)
 app.include_router(model_router)
 
@@ -94,6 +96,7 @@ def encode_image(image: Image.Image) -> str:
 
 
 @app.post("/pixelize", response_model=PixelizeResponse)
+@app.post("/api/pixelize", response_model=PixelizeResponse)  # The same under /api, which the frontend dev server passes on
 def pixelize_layers(request: PixelizeRequest):
     """Give all layers the same big-pixel grid and the same palette. Each layer comes back on its own, cut to its content."""
     images = [decode_image(layer.image, layer.name) for layer in request.layers]

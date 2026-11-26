@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import HeroPortrait from '../components/party/HeroPortrait'
 import PixelScene from '../components/pixel-scene/PixelScene'
-import { Badge, Button, Panel, SectionTitle } from '../components/ui'
+import { ActSteps, Button, MusicToggle, Panel, SectionTitle } from '../components/ui'
 import { canDictate, useDictation } from '../audio/useDictation'
 import VoiceMeter from '../components/ui/VoiceMeter'
-import { loadSave, storeSave, type Save, type ActState } from '../data/saves'
-import { editStory, storyText, wordsByHero, type StoryPiece } from '../data/story'
+import { actStart, loadSave, storeSave, type Save, type ActState } from '../data/saves'
+import { editStory, splitStory, storyText, wordsByHero, type StoryPiece } from '../data/story'
+import { roman } from '../data/roman'
 import styles from './StoryPage.module.css'
 
 type SaveState = 'saved' | 'saving' | 'failed'
@@ -20,10 +21,13 @@ export default function StoryPage() {
   const id = useRef(saveId())
   const [save, setSave] = useState<Save | null>(null)
   const [missing, setMissing] = useState(false)
-  const [pieces, setPieces] = useState<StoryPiece[]>([])
   const [gmDirection, setGmDirection] = useState('')
+  /** The whole story, every act */
+  const [story, setStory] = useState<StoryPiece[]>([])
   const [writer, setWriter] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<SaveState>('saved')
+  /** The box holds only the act being written; earlier acts are shown apart, under "Story so far" */
+  const { earlier, current: pieces } = splitStory(story, actStart(save?.play, save?.play?.act ?? 1))
   const mirror = useRef<HTMLDivElement>(null)
   const field = useRef<HTMLTextAreaElement>(null)
   /** Where the cursor is, so the writer's portrait can follow it */
@@ -57,8 +61,8 @@ export default function StoryPage() {
     loadSave(id.current).then((loaded) => {
       if (!loaded) return setMissing(true)
       setSave(loaded)
-      setPieces(loaded.play?.story ?? [])
       setGmDirection(loaded.play?.gmDirection ?? '')
+      setStory(loaded.play?.story ?? [])
       setWriter(loaded.setup.party[0]?.id ?? null)
     })
   }, [])
@@ -91,8 +95,8 @@ export default function StoryPage() {
 
   const type = (text: string) => {
     if (!writer) return
-    const next = editStory(pieces, text, writer)
-    setPieces(next)
+    const next = [...earlier, ...editStory(pieces, text, writer)]
+    setStory(next)
     keep(next)
     setTyping(true)
     window.clearTimeout(typingTimer.current)
@@ -133,6 +137,7 @@ export default function StoryPage() {
     number: save.play?.act ?? 1,
     state: save.play?.actState ?? 'writing',
   }
+
   /** Draws pieces in their writers' colours */
   const paint = (list: StoryPiece[], key: string) =>
     list.map((piece, i) => (
@@ -140,6 +145,29 @@ export default function StoryPage() {
         {piece.text}
       </span>
     ))
+
+  /** The acts already drawn, each with its own part of the story, oldest first */
+  const history = (save.play?.acts ?? [])
+    .filter((a) => a.number < now.number)
+    .sort((a, b) => a.number - b.number)
+    .map((a) => ({ number: a.number, pieces: splitStory(splitStory(story, a.to).earlier, a.from).current }))
+
+  /** Saves what is written right away, then opens the drawing page */
+  const openDraw = async () => {
+    if (!id.current) return
+    window.clearTimeout(timer.current)
+    setSaveState('saving')
+    try {
+      await storeSave(id.current, {
+        ...save,
+        phase: 'playing',
+        play: { ...save.play, act: save.play?.act ?? 1, actState: save.play?.actState ?? 'writing', story },
+      })
+    } catch {
+      return setSaveState('failed')
+    }
+    window.location.href = `/draw?save=${encodeURIComponent(id.current)}`
+  }
 
   const writing = party.find((h) => h.id === writer)
 
@@ -149,7 +177,7 @@ export default function StoryPage() {
   return (
     <Frame
       actions={
-        <Button onClick={() => keep(pieces, 0)} disabled={saveState === 'saving'} role="status">
+        <Button onClick={() => keep(story, 0)} disabled={saveState === 'saving'} role="status">
           {{ saved: 'Saved ✓', saving: 'Saving…', failed: 'Not saved' }[saveState]}
         </Button>
       }
@@ -160,6 +188,29 @@ export default function StoryPage() {
           Act {now.number} · {now.state === 'drawn' ? 'Drawn' : 'Writing'}
         </span>
       </div>
+      {history.length > 0 && (
+        <details className={styles.history} open>
+          <summary>
+            Story so far · {history.length} {history.length === 1 ? 'act' : 'acts'}
+          </summary>
+          <div className={styles.historyActs}>
+            {history.map((a) => (
+              <section key={a.number} className={styles.historyAct}>
+                <h3>
+                  Act {roman(a.number)}
+                  <a
+                    className={styles.openAct}
+                    href={`/layers?save=${encodeURIComponent(saveId() ?? '')}&act=${a.number}`}
+                  >
+                    🖼 Layers
+                  </a>
+                </h3>
+                <p>{paint(a.pieces, `h${a.number}-`)}</p>
+              </section>
+            ))}
+          </div>
+        </details>
+      )}
       <div className={styles.direction}>
         <label className={styles.directionLabel} htmlFor="gm-direction">
           Gamemaster&apos;s direction
@@ -288,9 +339,14 @@ export default function StoryPage() {
         />
       </div>
       <div className={styles.drawRow}>
-        <Button variant="primary" disabled>
+        <Button
+          variant="primary"
+          disabled={!text.trim() || saveState === 'saving'}
+          title={text.trim() ? undefined : `Write act ${now.number} first`}
+          onClick={openDraw}
+        >
           <BrushIcon />
-          Draw this scene <Badge>coming soon</Badge>
+          Draw this scene
         </Button>
       </div>
     </Frame>
@@ -341,8 +397,12 @@ function Frame({ actions, children }: { actions?: ReactNode; children: ReactNode
       <div className={styles.shade} />
       <main className={styles.content}>
         <div className={styles.topBar}>
-          <Button href="/">Home</Button>
-          {actions}
+          <ActSteps current={0} />
+          <div className={styles.topActions}>
+            <Button href="/">Home</Button>
+            <MusicToggle />
+            {actions}
+          </div>
         </div>
         <Panel className={styles.panel}>{children}</Panel>
       </main>
