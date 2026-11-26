@@ -392,6 +392,7 @@
 }
 
 .toolbar .tools {
+  flex-wrap: wrap;
   font-size: inherit;
   gap: 0.5rem;
 }
