@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import PixelScene from '../components/pixel-scene/PixelScene'
-import { ActSteps, Button, Eyebrow, MusicToggle, Panel, SectionTitle } from '../components/ui'
+import { ActSteps, Button, Eyebrow, GuideHint, MusicToggle, Panel, SectionTitle } from '../components/ui'
+import { GUIDANCE } from '../data/guidance'
 import { roman } from '../data/roman'
 import { generateImage, pixelize, randomSeed } from '../api/images'
 import { actStart, loadSave, storeSave, type Save } from '../data/saves'
@@ -144,6 +145,13 @@ export default function DrawPage() {
                   <SectionTitle className={styles.title}>{save.setup.title}</SectionTitle>
                 </div>
               </header>
+              <GuideHint>
+                {drawing
+                  ? GUIDANCE.draw.drawing
+                  : candidates.some((c) => c.image)
+                    ? GUIDANCE.draw.choose
+                    : GUIDANCE.draw.ready}
+              </GuideHint>
 
               <div className={styles.scroll}>
                 <span className={styles.label}>

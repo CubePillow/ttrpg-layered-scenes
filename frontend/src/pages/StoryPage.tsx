@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import HeroPortrait from '../components/party/HeroPortrait'
 import PixelScene from '../components/pixel-scene/PixelScene'
-import { ActSteps, Button, MusicToggle, Panel, SectionTitle } from '../components/ui'
+import { ActSteps, Button, GuideHint, MusicToggle, Panel, SectionTitle } from '../components/ui'
 import { canDictate, useDictation } from '../audio/useDictation'
 import VoiceMeter from '../components/ui/VoiceMeter'
 import { actStart, loadSave, storeSave, type Save, type ActState } from '../data/saves'
 import { editStory, splitStory, storyText, wordsByHero, type StoryPiece } from '../data/story'
+import { GUIDANCE } from '../data/guidance'
 import { roman } from '../data/roman'
 import styles from './StoryPage.module.css'
 
@@ -188,6 +189,7 @@ export default function StoryPage() {
           Act {now.number} · {now.state === 'drawn' ? 'Drawn' : 'Writing'}
         </span>
       </div>
+      <GuideHint>{text.trim() ? GUIDANCE.story.written : GUIDANCE.story.empty}</GuideHint>
       {history.length > 0 && (
         <details className={styles.history} open>
           <summary>

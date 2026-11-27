@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import PixelScene from '../components/pixel-scene/PixelScene'
-import { ActSteps, Button, Eyebrow, MusicToggle, Panel, SectionTitle, TextInput } from '../components/ui'
+import { ActSteps, Button, Eyebrow, GuideHint, MusicToggle, Panel, SectionTitle, TextInput } from '../components/ui'
+import { GUIDANCE } from '../data/guidance'
 import { roman } from '../data/roman'
 import { editLayer, pixelize, splitImage } from '../api/images'
 import { pictureData, storePicture } from '../api/pictures'
@@ -555,6 +556,11 @@ export default function LayersPage() {
               <SectionTitle className={styles.title}>{save?.setup.title ?? 'Layers'}</SectionTitle>
             </div>
           </header>
+          {picked && !arrangeOnly && (
+            <GuideHint>
+              {splitting ? GUIDANCE.layers.splitting : layers.length === 0 ? GUIDANCE.layers.name : GUIDANCE.layers.arrange}
+            </GuideHint>
+          )}
 
           {!picked ? (
             <>
