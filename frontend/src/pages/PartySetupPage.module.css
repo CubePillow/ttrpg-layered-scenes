@@ -44,6 +44,12 @@
   gap: 0.5rem;
 }
 
+/* The hint for the table, as wide as the step panels */
+.guide {
+  width: min(100%, 720px);
+  margin: 0;
+}
+
 .loading {
   text-align: center;
 }

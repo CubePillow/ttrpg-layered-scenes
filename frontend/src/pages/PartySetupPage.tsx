@@ -9,8 +9,9 @@ import ModeStage from '../components/party/ModeStage'
 import ReadyStage, { type SaveState } from '../components/party/ReadyStage'
 import StyleStage from '../components/party/StyleStage'
 import PixelScene from '../components/pixel-scene/PixelScene'
-import { Button, StepTrail } from '../components/ui'
+import { Button, GuideHint, StepTrail } from '../components/ui'
 import { DEFAULT_ART_STYLE, type ArtStyleId } from '../data/artStyles'
+import { GUIDANCE } from '../data/guidance'
 import type { Hero } from '../data/heroes'
 import { loadSave, setupSave, storeSave } from '../data/saves'
 import styles from './PartySetupPage.module.css'
@@ -146,6 +147,7 @@ export default function PartySetupPage() {
             </Button>
           </div>
         </div>
+        {!loading && GUIDANCE.setup[step] && <GuideHint className={styles.guide}>{GUIDANCE.setup[step]}</GuideHint>}
         {loading && <p className={styles.loading}>Loading your saved party…</p>}
         {!loading && step === 0 && <ModeStage onLocal={() => setStep(1)} />}
         {!loading && step === 1 && (
